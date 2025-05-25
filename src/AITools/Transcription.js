@@ -21,6 +21,7 @@ class Transcription extends Component {
         inputFile: 'tmp/input.mp3',
         outputFormats: ['txt'], // array of selected formats
         configLoading: false,
+        stButton: false,
         formatOptions: [
             { key: 'txt', value: 'txt', text: '--txt (text file)' },
             { key: 'srt', value: 'srt', text: '--srt (subtitles)' }
@@ -69,6 +70,7 @@ class Transcription extends Component {
             mqtt.join("exec/service/ai-trns/#")
             mqtt.join("exec/state/ai-trns")
             mqtt.join("exec/service/data/#")
+            this.sendStatus();
             mqtt.watch((message) => {
                 this.handleMessage(message);
             });
@@ -81,8 +83,10 @@ class Transcription extends Component {
             console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime.toFixed(1)} sec`);
             this.setState({ serviceStatus: alive, runtime });
             if(!alive) {
-                this.setState({ percent: 0 });
+                this.setState({ percent: 0, stButton: false });
                 clearInterval(this.state.reportInterval);
+            } else {
+                this.setState({ stButton: true });
             }
         }
 
@@ -106,7 +110,15 @@ class Transcription extends Component {
         mqtt.send("status", false, "exec/service/ai-trns/python");
     }
 
+    buttonDisable = () => {
+        this.setState({stButton: true});
+        setTimeout(() => {
+            this.setState({stButton: false});
+        }, 10000);
+    }
+
     startTranscription = () => {
+        this.buttonDisable();
         this.sendMessage();
         setTimeout(() => {
             const reportInterval = setInterval(() => {
@@ -165,7 +177,7 @@ class Transcription extends Component {
     }
 
     render() {
-        const {user, roles} = this.state;
+        const {user, roles, stButton} = this.state;
 
         const props = {
             action: `${AI_BACKEND}`,
@@ -200,7 +212,7 @@ class Transcription extends Component {
                         <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'monospace', marginTop: 10}}>
                              {this.state.logText}
                         </pre>
-                        <Button key={i + 100} size='massive' color='blue' onClick={this.startTranscription} >
+                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={this.startTranscription} >
                             Start Transcription
                         </Button>
                         <div style={{marginTop: 20}}>
