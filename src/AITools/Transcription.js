@@ -176,6 +176,28 @@ class Transcription extends Component {
         this.setState({ outputFormats: value });
     }
 
+    handleDownload = async (fileName) => {
+        try {
+            const response = await fetch(`https://ai.isr.sh/${fileName}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download error:', error);
+            alert(`Ошибка при загрузке файла: ${error.message}`);
+        }
+    }
+
     render() {
         const {user, roles, stButton} = this.state;
 
@@ -216,12 +238,19 @@ class Transcription extends Component {
                             Start Transcription
                         </Button>
                         <div style={{marginTop: 20}}>
-                            <a href="https://ai.isr.sh/output.txt" target="_blank" rel="noopener noreferrer" style={{marginRight: 10}}>
-                                <Button color="gray" icon="download" content="Download output.txt" />
-                            </a>
-                            <a href="https://ai.isr.sh/output.srt" target="_blank" rel="noopener noreferrer">
-                                <Button color="gray" icon="download" content="Download output.srt" />
-                            </a>
+                            <Button 
+                                color="gray" 
+                                icon="download" 
+                                content="Download output.txt" 
+                                onClick={() => this.handleDownload('output.txt')}
+                                style={{marginRight: 10}}
+                            />
+                            <Button 
+                                color="gray" 
+                                icon="download" 
+                                content="Download output.srt" 
+                                onClick={() => this.handleDownload('output.srt')}
+                            />
                         </div>
 
                         {/* Configuration section */}
