@@ -56,6 +56,8 @@ class Transcription extends Component {
         this.setState({
             inputFile: uploadedFileName,
             percent: 0
+        }, () => {
+            this.saveConfiguration();
         });
     };
 
@@ -182,7 +184,7 @@ class Transcription extends Component {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -238,17 +240,17 @@ class Transcription extends Component {
                             Start Transcription
                         </Button>
                         <div style={{marginTop: 20}}>
-                            <Button 
-                                color="gray" 
-                                icon="download" 
-                                content="Download output.txt" 
+                            <Button
+                                color="gray"
+                                icon="download"
+                                content="Download output.txt"
                                 onClick={() => this.handleDownload('output.txt')}
                                 style={{marginRight: 10}}
                             />
-                            <Button 
-                                color="gray" 
-                                icon="download" 
-                                content="Download output.srt" 
+                            <Button
+                                color="gray"
+                                icon="download"
+                                content="Download output.srt"
                                 onClick={() => this.handleDownload('output.srt')}
                             />
                         </div>
