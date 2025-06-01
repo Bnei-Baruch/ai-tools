@@ -4,7 +4,7 @@ import Upload from 'rc-upload';
 import LoginPage from './LoginPage';
 import {kc} from "./UserManager";
 import mqtt from "./mqtt";
-import {AI_BACKEND} from "./consts";
+import {AI_BACKEND, EXEC_API} from "./consts";
 import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray} from "./tools";
 
 class Transcription extends Component {
@@ -82,7 +82,7 @@ class Transcription extends Component {
     handleMessage = (message) => {
         if (message?.action === "status") {
             const {alive, runtime, name} = message.data || {};
-            console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime.toFixed(1)} sec`);
+            console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime?.toFixed(1)} sec`);
             this.setState({ serviceStatus: alive, runtime });
             if(!alive) {
                 this.setState({ percent: 0, stButton: false });
@@ -180,7 +180,7 @@ class Transcription extends Component {
 
     handleDownload = async (fileName) => {
         try {
-            const response = await fetch(`https://ai.isr.sh/${fileName}`);
+            const response = await fetch(`${EXEC_API}/get/${fileName}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
