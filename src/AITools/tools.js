@@ -31,7 +31,7 @@ export const getConfig = async () => {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (response.ok) {
             return await response.json();
         } else {
@@ -53,7 +53,7 @@ export const updateServiceArgs = async (serviceName, args) => {
             },
             body: JSON.stringify({ args })
         });
-        
+
         if (response.ok) {
             return true;
         } else {
@@ -75,7 +75,7 @@ export const setConfig = async (config) => {
             },
             body: JSON.stringify(config)
         });
-        
+
         if (response.ok) {
             return true;
         } else {
@@ -175,7 +175,7 @@ export const parseArgsFromConfig = (config) => {
 
 export const createArgsArray = (inputFile, outputFormats) => {
     const args = ["whisper_fullfile_cli.py"];
-    
+
     // Add formats
     if (outputFormats.includes('txt')) {
         args.push('--txt');
@@ -183,21 +183,23 @@ export const createArgsArray = (inputFile, outputFormats) => {
     if (outputFormats.includes('srt')) {
         args.push('--srt');
     }
-    
+
     // // Add language (can be made configurable later)
-    // args.push('--language', 'ru');
-    
+    // args.push('--lang', 'ru');
+
+    args.push('--fix-rtl');
+
     // Add input file
     args.push('--input', inputFile);
-    
+
     return args;
 };
 
 export const updateArgsInConfig = (config, inputFile, outputFormats) => {
     const updatedConfig = JSON.parse(JSON.stringify(config)); // deep copy
-    
+
     let pythonService = updatedConfig.Services?.find(service => service.ID === "python");
-    
+
     // If service doesn't exist, create it
     if (!pythonService) {
         if (!updatedConfig.Services) {
@@ -214,6 +216,6 @@ export const updateArgsInConfig = (config, inputFile, outputFormats) => {
 
     // Create new Args array
     pythonService.Args = createArgsArray(inputFile, outputFormats);
-    
+
     return updatedConfig;
 };
