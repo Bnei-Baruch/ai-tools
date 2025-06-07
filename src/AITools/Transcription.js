@@ -20,11 +20,17 @@ class Transcription extends Component {
         reportInterval: null,
         inputFile: 'tmp/input.mp3',
         outputFormats: ['txt'], // array of selected formats
+        language: 'he', // default to Hebrew
         configLoading: false,
         stButton: false,
         formatOptions: [
             { key: 'txt', value: 'txt', text: '--txt (text file)' },
             { key: 'srt', value: 'srt', text: '--srt (subtitles)' }
+        ],
+        languageOptions: [
+            { key: 'he', value: 'he', text: 'Hebrew (עברית)' },
+            { key: 'en', value: 'en', text: 'English' },
+            { key: 'ru', value: 'ru', text: 'Russian (Русский)' }
         ]
     };
 
@@ -64,10 +70,6 @@ class Transcription extends Component {
     initMQTT = (user) => {
         mqtt.init(user, (data) => {
             console.log("[mqtt] init: ", data, user);
-            //mqtt.join("subtitles/morning_lesson/he/slide");
-            //mqtt.join("subtitles/morning_lesson/he/question");
-            //mqtt.join("janus/events/#");
-            //mqtt.join("keycloak/events/#");
             mqtt.join("exec/status/ai-trns")
             mqtt.join("exec/service/ai-trns/#")
             mqtt.join("exec/state/ai-trns")
@@ -140,7 +142,8 @@ class Transcription extends Component {
             const parsed = parseArgsFromConfig(config);
             this.setState({
                 inputFile: parsed.inputFile,
-                outputFormats: parsed.outputFormats
+                outputFormats: parsed.outputFormats,
+                language: parsed.language
             });
         } catch (error) {
             console.error('Configuration loading error:', error);
@@ -151,12 +154,12 @@ class Transcription extends Component {
     }
 
     saveConfiguration = async () => {
-        const { inputFile, outputFormats } = this.state;
+        const { inputFile, outputFormats, language } = this.state;
         this.setState({ configLoading: true });
 
         try {
             // Create arguments array
-            const args = createArgsArray(inputFile, outputFormats);
+            const args = createArgsArray(inputFile, outputFormats, language);
 
             // Update whisper service arguments via correct API
             await updateServiceArgs('whisper', args);
@@ -176,6 +179,10 @@ class Transcription extends Component {
 
     handleFormatChange = (e, { value }) => {
         this.setState({ outputFormats: value });
+    }
+
+    handleLanguageChange = (e, { value }) => {
+        this.setState({ language: value });
     }
 
     handleDownload = async (fileName) => {
@@ -259,17 +266,17 @@ class Transcription extends Component {
                         <Segment style={{marginTop: 30}}>
                             <Header as='h3'>AI Transcription Settings</Header>
                             <Form>
-                                <Form.Field>
-                                    <label>AI Transcription Service Configuration</label>
-                                    <Button
-                                        color='blue'
-                                        onClick={this.loadConfigFields}
-                                        loading={this.state.configLoading}
-                                        style={{marginBottom: 15}}
-                                    >
-                                        Load Current Settings
-                                    </Button>
-                                </Form.Field>
+                                {/*<Form.Field>*/}
+                                {/*    <label>AI Transcription Service Configuration</label>*/}
+                                {/*    <Button*/}
+                                {/*        color='blue'*/}
+                                {/*        onClick={this.loadConfigFields}*/}
+                                {/*        loading={this.state.configLoading}*/}
+                                {/*        style={{marginBottom: 15}}*/}
+                                {/*    >*/}
+                                {/*        Load Current Settings*/}
+                                {/*    </Button>*/}
+                                {/*</Form.Field>*/}
 
                                 <Form.Field>
                                     <label>Input File</label>
@@ -299,6 +306,21 @@ class Transcription extends Component {
                                     </small>
                                 </Form.Field>
 
+                                <Form.Field>
+                                    <label>Language</label>
+                                    <Dropdown
+                                        placeholder='Select language'
+                                        fluid
+                                        selection
+                                        options={this.state.languageOptions}
+                                        value={this.state.language}
+                                        onChange={this.handleLanguageChange}
+                                    />
+                                    <small style={{color: '#666'}}>
+                                        Select the language for transcription
+                                    </small>
+                                </Form.Field>
+
                                 <div style={{marginTop: 20}}>
                                     <Button
                                         color='green'
@@ -311,14 +333,15 @@ class Transcription extends Component {
                                     </Button>
                                 </div>
 
-                                <div style={{marginTop: 15, padding: 10, backgroundColor: '#f8f9fa', borderRadius: 5}}>
-                                    <small style={{color: '#666'}}>
-                                        <strong>Current Settings:</strong><br/>
-                                        Input file: <code>{this.state.inputFile}</code><br/>
-                                        Output formats: <code>{this.state.outputFormats.map(f => `--${f}`).join(' ')}</code><br/>
-                                        Command: <code>python3 whisper_fullfile_cli.py {this.state.outputFormats.map(f => `--${f}`).join(' ')} --input {this.state.inputFile}</code>
-                                    </small>
-                                </div>
+                                {/*<div style={{marginTop: 15, padding: 10, backgroundColor: '#f8f9fa', borderRadius: 5}}>*/}
+                                {/*    <small style={{color: '#666'}}>*/}
+                                {/*        <strong>Current Settings:</strong><br/>*/}
+                                {/*        Input file: <code>{this.state.inputFile}</code><br/>*/}
+                                {/*        Output formats: <code>{this.state.outputFormats.map(f => `--${f}`).join(' ')}</code><br/>*/}
+                                {/*        Language: <code>--lang {this.state.language}</code><br/>*/}
+                                {/*        Command: <code>python3 whisper_fullfile_cli.py {this.state.outputFormats.map(f => `--${f}`).join(' ')} --lang {this.state.language}{this.state.language === 'he' ? ' --fix-rtl' : ''} --input {this.state.inputFile}</code>*/}
+                                {/*    </small>*/}
+                                {/*</div>*/}
                             </Form>
                         </Segment>
                     </Message>);

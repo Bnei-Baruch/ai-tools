@@ -142,19 +142,26 @@ export const getConfigField = async (key, field) => {
 export const parseArgsFromConfig = (config) => {
     const pythonService = config.Services?.find(service => service.ID === "python");
     if (!pythonService || !pythonService.Args) {
-        return { inputFile: 'tmp/input.mp3', outputFormats: ['txt'] };
+        return { inputFile: 'tmp/input.mp3', outputFormats: ['txt'], language: 'he' };
     }
 
     const args = pythonService.Args;
     const result = {
         inputFile: 'tmp/input.mp3',
-        outputFormats: []
+        outputFormats: [],
+        language: 'he' // Default to Hebrew
     };
 
     // Look for --input
     const inputIndex = args.findIndex(arg => arg === '--input');
     if (inputIndex !== -1 && inputIndex + 1 < args.length) {
         result.inputFile = args[inputIndex + 1];
+    }
+
+    // Look for --lang
+    const langIndex = args.findIndex(arg => arg === '--lang');
+    if (langIndex !== -1 && langIndex + 1 < args.length) {
+        result.language = args[langIndex + 1];
     }
 
     // Look for --txt and --srt
@@ -173,7 +180,7 @@ export const parseArgsFromConfig = (config) => {
     return result;
 };
 
-export const createArgsArray = (inputFile, outputFormats) => {
+export const createArgsArray = (inputFile, outputFormats, language = 'he') => {
     const args = ["whisper_fullfile_cli.py"];
 
     // Add formats
@@ -184,10 +191,13 @@ export const createArgsArray = (inputFile, outputFormats) => {
         args.push('--srt');
     }
 
-    // // Add language (can be made configurable later)
-    // args.push('--lang', 'ru');
+    // Add language
+    args.push('--lang', language);
 
-    args.push('--fix-rtl');
+    // Add --fix-rtl only for Hebrew
+    if (language === 'he') {
+        args.push('--fix-rtl');
+    }
 
     // Add input file
     args.push('--input', inputFile);
@@ -195,7 +205,7 @@ export const createArgsArray = (inputFile, outputFormats) => {
     return args;
 };
 
-export const updateArgsInConfig = (config, inputFile, outputFormats) => {
+export const updateArgsInConfig = (config, inputFile, outputFormats, language = 'he') => {
     const updatedConfig = JSON.parse(JSON.stringify(config)); // deep copy
 
     let pythonService = updatedConfig.Services?.find(service => service.ID === "python");
@@ -215,7 +225,7 @@ export const updateArgsInConfig = (config, inputFile, outputFormats) => {
     }
 
     // Create new Args array
-    pythonService.Args = createArgsArray(inputFile, outputFormats);
+    pythonService.Args = createArgsArray(inputFile, outputFormats, language);
 
     return updatedConfig;
 };
