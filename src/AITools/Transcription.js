@@ -127,10 +127,11 @@ class Transcription extends Component {
         this.setState({stButton: true});
         setTimeout(() => {
             this.setState({stButton: false});
-        }, 10000);
+        }, 20000);
     }
 
     startTranscription = () => {
+        this.setState({ logText: "Transcription in progress..." });
         this.buttonDisable();
         this.sendMessage();
         setTimeout(() => {
@@ -288,36 +289,32 @@ class Transcription extends Component {
                             <Header as='h3'>Choose You Settings</Header>
                             <Form>
 
-                                <Form.Field>
-                                    <label>Language</label>
-                                    <Dropdown
-                                        placeholder='Select language'
-                                        fluid
-                                        selection
-                                        options={this.state.languageOptions}
-                                        value={this.state.language}
-                                        onChange={this.handleLanguageChange}
-                                    />
-                                    <small style={{color: '#666'}}>
-                                        Select the language for transcription
-                                    </small>
-                                </Form.Field>
+                                <Form.Group widths='equal'>
+                                    <Form.Field>
+                                        <label>Language</label>
+                                        <Dropdown
+                                            placeholder='Select language'
+                                            fluid
+                                            selection
+                                            options={this.state.languageOptions}
+                                            value={this.state.language}
+                                            onChange={this.handleLanguageChange}
+                                        />
+                                    </Form.Field>
 
-                                <Form.Field>
-                                    <label>Output Formats</label>
-                                    <Dropdown
-                                        placeholder='Select formats'
-                                        fluid
-                                        selection
-                                        multiple
-                                        options={this.state.formatOptions}
-                                        value={this.state.outputFormats}
-                                        onChange={this.handleFormatChange}
-                                    />
-                                    <small style={{color: '#666'}}>
-                                        Select one or more output formats
-                                    </small>
-                                </Form.Field>
+                                    <Form.Field>
+                                        <label>Output Formats</label>
+                                        <Dropdown
+                                            placeholder='Select formats'
+                                            fluid
+                                            selection
+                                            multiple
+                                            options={this.state.formatOptions}
+                                            value={this.state.outputFormats}
+                                            onChange={this.handleFormatChange}
+                                        />
+                                    </Form.Field>
+                                </Form.Group>
 
                             </Form>
                         </Segment>
