@@ -27,9 +27,6 @@ kc.onAuthLogout = () => {
     initOptions.onLoad = "login-required";
     kc.init(initOptions).then((a) => {
         if (a) {
-            console.log("check-sso", kc)
-            console.log("access token: ", kc.token)
-            console.log("refresh token: ", kc.refreshToken)
         } else {
             kc.logout();
         }
@@ -43,8 +40,6 @@ const renewToken = (retry) => {
     kc.updateToken(5)
         .then((refreshed) => {
             if (refreshed) {
-                console.log("Token updated: ", kc);
-                console.log("Refresh token exp : ", kc.refreshTokenParsed.exp - kc.refreshTokenParsed.iat);
                 mqtt.setToken(kc.token);
             }
         })
@@ -75,9 +70,6 @@ export const getUser = (callback) => {
     kc.init(initOptions)
         .then((authenticated) => {
             if (authenticated) {
-                console.log("check-sso", kc)
-                console.log("access token: ", kc.token)
-                console.log("refresh token: ", kc.refreshToken)
                 const user = setData();
                 callback(user);
             } else {

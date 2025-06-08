@@ -55,12 +55,18 @@ class Transcription extends Component {
         this.setState({percent: count});
     };
 
+    uploadStart = () => {
+        console.log("uploading...");
+        this.setState({logText: "Uploading..."})
+    }
+
     uploadDone = (file_data) => {
         console.log(":: UploadApp - got data: ", file_data);
         // Set uploaded file name to input field
         const uploadedFileName = `tmp/${file_data.file_name}`;
         this.setState({
             inputFile: uploadedFileName,
+            logText: "",
             percent: 0
         }, () => {
             this.saveConfiguration();
@@ -87,7 +93,7 @@ class Transcription extends Component {
             console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime?.toFixed(1)} sec`);
             this.setState({ serviceStatus: alive, runtime });
             if(!alive) {
-                this.setState({ percent: 0, stButton: false });
+                this.setState({ percent: 0, stButton: false, logText: "" });
                 clearInterval(this.state.reportInterval);
             } else {
                 this.setState({ stButton: true });
@@ -101,7 +107,7 @@ class Transcription extends Component {
             if (percentMatch) {
                 const percent = parseInt(percentMatch[1]);
                 console.log("[mqtt] percent:", percent);
-                this.setState({ percent, logText: logLine });
+                this.setState({ percent, logText: "Transcription in progress..." });
             }
         }
     }
@@ -153,7 +159,7 @@ class Transcription extends Component {
         }
     }
 
-    saveConfiguration = async () => {
+    saveConfiguration = async (startTranscription) => {
         const { inputFile, outputFormats, language } = this.state;
         this.setState({ configLoading: true });
 
@@ -163,8 +169,7 @@ class Transcription extends Component {
 
             // Update whisper service arguments via correct API
             await updateServiceArgs('whisper', args);
-
-            alert('Configuration saved successfully');
+            if(startTranscription) this.startTranscription()
         } catch (error) {
             console.error('Configuration saving error:', error);
             alert('Configuration saving error');
@@ -236,6 +241,7 @@ class Transcription extends Component {
                             {...props}
                             className="aricha"
                             onSuccess={this.uploadDone}
+                            onStart={this.uploadStart}
                             onProgress={this.progress} >
                             Drop file here or click me
                         </Upload>
@@ -243,7 +249,7 @@ class Transcription extends Component {
                         <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'monospace', marginTop: 10}}>
                              {this.state.logText}
                         </pre>
-                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={this.startTranscription} >
+                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={() => this.saveConfiguration(true)} >
                             Start Transcription
                         </Button>
                         <div style={{marginTop: 20}}>
@@ -321,17 +327,17 @@ class Transcription extends Component {
                                     </small>
                                 </Form.Field>
 
-                                <div style={{marginTop: 20}}>
-                                    <Button
-                                        color='green'
-                                        size='large'
-                                        onClick={this.saveConfiguration}
-                                        loading={this.state.configLoading}
-                                        disabled={!this.state.inputFile.trim() || this.state.outputFormats.length === 0}
-                                    >
-                                        Save Settings
-                                    </Button>
-                                </div>
+                                {/*<div style={{marginTop: 20}}>*/}
+                                {/*    <Button*/}
+                                {/*        color='green'*/}
+                                {/*        size='large'*/}
+                                {/*        onClick={this.saveConfiguration}*/}
+                                {/*        loading={this.state.configLoading}*/}
+                                {/*        disabled={!this.state.inputFile.trim() || this.state.outputFormats.length === 0}*/}
+                                {/*    >*/}
+                                {/*        Save Settings*/}
+                                {/*    </Button>*/}
+                                {/*</div>*/}
 
                                 {/*<div style={{marginTop: 15, padding: 10, backgroundColor: '#f8f9fa', borderRadius: 5}}>*/}
                                 {/*    <small style={{color: '#666'}}>*/}
