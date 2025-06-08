@@ -18,8 +18,8 @@ class Transcription extends Component {
         serviceAlive: false,
         logText: '',
         reportInterval: null,
-        inputFile: 'tmp/input.mp3',
-        outputFormats: ['txt'], // array of selected formats
+        inputFile: '',
+        outputFormats: ['srt'], // array of selected formats
         language: 'he', // default to Hebrew
         configLoading: false,
         stButton: false,
@@ -30,12 +30,13 @@ class Transcription extends Component {
         languageOptions: [
             { key: 'he', value: 'he', text: 'Hebrew (עברית)' },
             { key: 'en', value: 'en', text: 'English' },
-            { key: 'ru', value: 'ru', text: 'Russian (Русский)' }
+            { key: 'ru', value: 'ru', text: 'Russian (Русский)' },
+            { key: 'auto', value: 'auto', text: 'Autodetect' }
         ]
     };
 
     componentDidMount() {
-        this.loadConfigFields()
+        //this.loadConfigFields()
     }
 
     checkPermission = (user) => {
@@ -93,7 +94,9 @@ class Transcription extends Component {
             console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime?.toFixed(1)} sec`);
             this.setState({ serviceStatus: alive, runtime });
             if(!alive) {
-                this.setState({ percent: 0, stButton: false, logText: "" });
+                this.setState({ percent: 0, stButton: false });
+                if(this.state.logText === "Transcription in progress...")
+                    this.setState({ logText: "Your files are ready!" });
                 clearInterval(this.state.reportInterval);
             } else {
                 this.setState({ stButton: true });
@@ -245,54 +248,58 @@ class Transcription extends Component {
                             onProgress={this.progress} >
                             Drop file here or click me
                         </Upload>
+                        <Form>
+                            <Form.Field>
+                                <label>OR</label>
+                                <Input
+                                    placeholder="Put http link here.."
+                                    value={this.state.inputFile}
+                                    onChange={(e) => this.handleInputFileChange(e.target.value)}
+                                />
+
+                            </Form.Field>
+                        </Form>
+
                         <Progress label='' percent={this.state.percent} indicating progress='percent' />
                         <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'monospace', marginTop: 10}}>
                              {this.state.logText}
                         </pre>
-                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={() => this.saveConfiguration(true)} >
-                            Start Transcription
-                        </Button>
-                        <div style={{marginTop: 20}}>
-                            <Button
-                                color="gray"
-                                icon="download"
-                                content="Download output.txt"
-                                onClick={() => this.handleDownload('output.txt')}
-                                style={{marginRight: 10}}
-                            />
-                            <Button
-                                color="gray"
-                                icon="download"
-                                content="Download output.srt"
-                                onClick={() => this.handleDownload('output.srt')}
-                            />
-                        </div>
+
+                        {this.state.logText === "Your files are ready!" && (
+                            <div style={{marginTop: 20}}>
+                                <Button
+                                    color="gray"
+                                    icon="download"
+                                    content="Download output.txt"
+                                    onClick={() => this.handleDownload('output.txt')}
+                                    style={{marginRight: 10}}
+                                />
+                                <Button
+                                    color="gray"
+                                    icon="download"
+                                    content="Download output.srt"
+                                    onClick={() => this.handleDownload('output.srt')}
+                                />
+                            </div>
+                        )}
 
                         {/* Configuration section */}
                         <Segment style={{marginTop: 30}}>
-                            <Header as='h3'>AI Transcription Settings</Header>
+                            <Header as='h3'>Choose You Settings</Header>
                             <Form>
-                                {/*<Form.Field>*/}
-                                {/*    <label>AI Transcription Service Configuration</label>*/}
-                                {/*    <Button*/}
-                                {/*        color='blue'*/}
-                                {/*        onClick={this.loadConfigFields}*/}
-                                {/*        loading={this.state.configLoading}*/}
-                                {/*        style={{marginBottom: 15}}*/}
-                                {/*    >*/}
-                                {/*        Load Current Settings*/}
-                                {/*    </Button>*/}
-                                {/*</Form.Field>*/}
 
                                 <Form.Field>
-                                    <label>Input File</label>
-                                    <Input
-                                        placeholder="tmp/input.mp3"
-                                        value={this.state.inputFile}
-                                        onChange={(e) => this.handleInputFileChange(e.target.value)}
+                                    <label>Language</label>
+                                    <Dropdown
+                                        placeholder='Select language'
+                                        fluid
+                                        selection
+                                        options={this.state.languageOptions}
+                                        value={this.state.language}
+                                        onChange={this.handleLanguageChange}
                                     />
                                     <small style={{color: '#666'}}>
-                                        Path to audio/video file for transcription
+                                        Select the language for transcription
                                     </small>
                                 </Form.Field>
 
@@ -312,44 +319,13 @@ class Transcription extends Component {
                                     </small>
                                 </Form.Field>
 
-                                <Form.Field>
-                                    <label>Language</label>
-                                    <Dropdown
-                                        placeholder='Select language'
-                                        fluid
-                                        selection
-                                        options={this.state.languageOptions}
-                                        value={this.state.language}
-                                        onChange={this.handleLanguageChange}
-                                    />
-                                    <small style={{color: '#666'}}>
-                                        Select the language for transcription
-                                    </small>
-                                </Form.Field>
-
-                                {/*<div style={{marginTop: 20}}>*/}
-                                {/*    <Button*/}
-                                {/*        color='green'*/}
-                                {/*        size='large'*/}
-                                {/*        onClick={this.saveConfiguration}*/}
-                                {/*        loading={this.state.configLoading}*/}
-                                {/*        disabled={!this.state.inputFile.trim() || this.state.outputFormats.length === 0}*/}
-                                {/*    >*/}
-                                {/*        Save Settings*/}
-                                {/*    </Button>*/}
-                                {/*</div>*/}
-
-                                {/*<div style={{marginTop: 15, padding: 10, backgroundColor: '#f8f9fa', borderRadius: 5}}>*/}
-                                {/*    <small style={{color: '#666'}}>*/}
-                                {/*        <strong>Current Settings:</strong><br/>*/}
-                                {/*        Input file: <code>{this.state.inputFile}</code><br/>*/}
-                                {/*        Output formats: <code>{this.state.outputFormats.map(f => `--${f}`).join(' ')}</code><br/>*/}
-                                {/*        Language: <code>--lang {this.state.language}</code><br/>*/}
-                                {/*        Command: <code>python3 whisper_fullfile_cli.py {this.state.outputFormats.map(f => `--${f}`).join(' ')} --lang {this.state.language}{this.state.language === 'he' ? ' --fix-rtl' : ''} --input {this.state.inputFile}</code>*/}
-                                {/*    </small>*/}
-                                {/*</div>*/}
                             </Form>
                         </Segment>
+
+                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={() => this.saveConfiguration(true)} >
+                            Start Transcription
+                        </Button>
+
                     </Message>);
             }
             return null
