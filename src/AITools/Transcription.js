@@ -28,9 +28,10 @@ class Transcription extends Component {
             { key: 'srt', value: 'srt', text: '--srt (subtitles)' }
         ],
         languageOptions: [
-            { key: 'he', value: 'he', text: 'Hebrew (עברית)' },
+            { key: 'he', value: 'he', text: 'Hebrew (V3)' },
+            { key: 'he_bb', value: 'he_bb', text: 'Hebrew (BB)' },
             { key: 'en', value: 'en', text: 'English' },
-            { key: 'ru', value: 'ru', text: 'Russian (Русский)' },
+            { key: 'ru', value: 'ru', text: 'Russian' },
             { key: 'auto', value: 'auto', text: 'Autodetect' }
         ]
     };
@@ -286,7 +287,7 @@ class Transcription extends Component {
 
                         {/* Configuration section */}
                         <Segment style={{marginTop: 30}}>
-                            <Header as='h3'>Choose You Settings</Header>
+                            <Header as='h3'>Choose Your Settings</Header>
                             <Form>
 
                                 <Form.Group widths='equal'>
