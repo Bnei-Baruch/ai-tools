@@ -11,6 +11,26 @@ export const randomString = (len) => {
     return randomString;
 };
 
+export const saveBlob = (blob, fileName) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+// Result files of the exec-api services (e.g. output.srt).
+export const fetchExecFile = async (fileName) => {
+    const response = await fetch(`${EXEC_API}/get/${fileName}`);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.blob();
+};
+
 export const getData = (path, cb) => fetch(`${path}`, {
     headers: {'Content-Type': 'application/json'}
 })

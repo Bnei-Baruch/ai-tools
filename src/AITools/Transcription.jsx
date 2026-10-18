@@ -1,11 +1,12 @@
 import React, { Component, Fragment } from 'react';
 import { Progress,Message,Button,Input,Form,Segment,Header,Dropdown } from 'semantic-ui-react';
 import Upload from 'rc-upload';
+import { Link } from 'react-router-dom';
 import LoginPage from './LoginPage';
 import {kc} from "./UserManager";
 import mqtt from "./mqtt";
-import {AI_BACKEND, EXEC_API} from "./consts";
-import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray} from "./tools";
+import {AI_BACKEND} from "./consts";
+import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile, saveBlob} from "./tools";
 
 class Transcription extends Component {
 
@@ -19,6 +20,7 @@ class Transcription extends Component {
         logText: '',
         reportInterval: null,
         inputFile: '',
+        audioFile: null, // uploaded File, handed over to the Speakers tool
         outputFormats: ['srt'], // array of selected formats
         language: 'he', // default to Hebrew
         configLoading: false,
@@ -57,9 +59,9 @@ class Transcription extends Component {
         this.setState({percent: count});
     };
 
-    uploadStart = () => {
+    uploadStart = (file) => {
         console.log("uploading...");
-        this.setState({logText: "Uploading..."})
+        this.setState({logText: "Uploading...", audioFile: file})
     }
 
     uploadDone = (file_data) => {
@@ -184,7 +186,7 @@ class Transcription extends Component {
     }
 
     handleInputFileChange = (value) => {
-        this.setState({ inputFile: value });
+        this.setState({ inputFile: value, audioFile: null });
     }
 
     handleFormatChange = (e, { value }) => {
@@ -197,20 +199,7 @@ class Transcription extends Component {
 
     handleDownload = async (fileName) => {
         try {
-            const response = await fetch(`${EXEC_API}/get/${fileName}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            saveBlob(await fetchExecFile(fileName), fileName);
         } catch (error) {
             console.error('Download error:', error);
             alert(`Ошибка при загрузке файла: ${error.message}`);
@@ -281,6 +270,15 @@ class Transcription extends Component {
                                     icon="download"
                                     content="Download output.srt"
                                     onClick={() => this.handleDownload('output.srt')}
+                                    style={{marginRight: 10}}
+                                />
+                                <Button
+                                    color="teal"
+                                    icon="users"
+                                    content="Add speakers"
+                                    as={Link}
+                                    to="/speakers"
+                                    state={{execSrt: 'output.srt', audio: this.state.audioFile}}
                                 />
                             </div>
                         )}
