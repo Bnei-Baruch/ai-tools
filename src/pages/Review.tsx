@@ -40,7 +40,7 @@ export default function Review() {
     <>
       {REVIEW_LOCAL && <div className="alert alert--warn review-local">מצב מקומי: התוצאות נשמרות רק בדפדפן הזה.</div>}
       <Routes>
-        <Route index element={REVIEW_SET ? <Navigate to={REVIEW_SET} replace /> : <div className="card">REACT_APP_REVIEW_SET is not set</div>} />
+        <Route index element={<Navigate to={REVIEW_SET} replace />} />
         <Route path=':setId/results' element={<ReviewReport />} />
         <Route path=':setId/*' element={<ReviewerSession />} />
       </Routes>
