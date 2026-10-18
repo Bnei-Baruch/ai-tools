@@ -67,8 +67,12 @@ const setData = () => {
     return user;
 }
 
+// keycloak-js allows init() only once per instance; later calls reuse its result.
+let initPromise = null;
+
 export const getUser = (callback) => {
-    kc.init(initOptions)
+    initPromise ??= kc.init(initOptions);
+    initPromise
         .then((authenticated) => {
             if (authenticated) {
                 const user = setData();

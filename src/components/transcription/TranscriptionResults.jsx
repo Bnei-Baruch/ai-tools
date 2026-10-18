@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
+import { isToolEnabled } from '../../tools';
 
 // audioFile: the uploaded File (null for a link), handed over to the Speakers tool with output.srt
 const TranscriptionResults = ({ onDownload, audioFile }) => (
@@ -19,14 +20,16 @@ const TranscriptionResults = ({ onDownload, audioFile }) => (
             onClick={() => onDownload('output.srt')}
             style={{marginRight: 10}}
         />
-        <Button
-            color="teal"
-            icon="users"
-            content="Add speakers"
-            as={Link}
-            to="/speakers"
-            state={{execSrt: 'output.srt', audio: audioFile}}
-        />
+        {isToolEnabled('speakers') && (
+            <Button
+                color="teal"
+                icon="users"
+                content="Add speakers"
+                as={Link}
+                to="/speakers"
+                state={{execSrt: 'output.srt', audio: audioFile}}
+            />
+        )}
     </div>
 );
 

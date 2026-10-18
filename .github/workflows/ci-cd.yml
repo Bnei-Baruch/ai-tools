@@ -2,7 +2,7 @@ name: CI/CD
 
 # CI: every push and pull request is type-checked and built.
 # CD: only a manual run (Actions -> CI/CD -> Run workflow, any branch) deploys
-# that build to https://ngx.kab.info/ai-tools/.
+# that build to https://ai-tools.kab.info/.
 on:
   push:
   pull_request:
