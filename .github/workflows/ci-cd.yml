@@ -1,8 +1,8 @@
 name: CI/CD
 
 # CI: every push and pull request is type-checked and built.
-# CD: a push to master (or a manual run on master) deploys that build to
-# https://ngx.kab.info/ai-tools/.
+# CD: only a manual run (Actions -> CI/CD -> Run workflow, any branch) deploys
+# that build to https://ngx.kab.info/ai-tools/.
 on:
   push:
   pull_request:
@@ -47,7 +47,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy
