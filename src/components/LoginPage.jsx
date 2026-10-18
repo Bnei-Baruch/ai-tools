@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
-import {kc,getUser} from './UserManager';
+import {kc,getUser} from '../api/UserManager';
+import {KEYCLOAK_URL, KEYCLOAK_REALM} from '../consts';
 import { Container, Message, Button, Dropdown } from 'semantic-ui-react';
 
 class LoginPage extends Component {
@@ -41,7 +42,7 @@ class LoginPage extends Component {
             <Dropdown inline text=''>
                 <Dropdown.Menu>
                     <Dropdown.Item content='Profile:' disabled />
-                    <Dropdown.Item text='My Account' onClick={() => window.open("https://accounts.kab.info/auth/realms/main/account", "_blank")} />
+                    <Dropdown.Item text='My Account' onClick={() => window.open(`${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/account`, "_blank")} />
                     <Dropdown.Item text='Sign Out' onClick={() => kc.logout()} />
                 </Dropdown.Menu>
             </Dropdown>);

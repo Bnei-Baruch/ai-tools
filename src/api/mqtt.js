@@ -1,6 +1,6 @@
 import mqtt from "mqtt";
-import {randomString} from "./tools";
-import {MQTT_URL} from "./consts";
+import {randomString} from "../utils";
+import {MQTT_URL} from "../consts";
 
 class MqttMsg {
     constructor() {

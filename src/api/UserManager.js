@@ -1,10 +1,11 @@
 import Keycloak from 'keycloak-js';
 import mqtt from "./mqtt";
+import {KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID} from "../consts";
 
 const userManagerConfig = {
-    url: 'https://accounts.kab.info/auth',
-    realm: 'main',
-    clientId: 'ai-tools'
+    url: KEYCLOAK_URL,
+    realm: KEYCLOAK_REALM,
+    clientId: KEYCLOAK_CLIENT_ID
 };
 
 const initOptions = {

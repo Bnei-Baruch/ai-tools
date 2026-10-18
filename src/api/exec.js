@@ -1,14 +1,13 @@
-import {EXEC_API} from "./consts";
+import {EXEC_API} from "../consts";
 import {kc} from "./UserManager";
 
-export const randomString = (len) => {
-    let charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let randomString = "";
-    for (let i = 0; i < len; i++) {
-        let randomPoz = Math.floor(Math.random() * charSet.length);
-        randomString += charSet.substring(randomPoz, randomPoz + 1);
+// Result files of the exec-api services (e.g. output.srt).
+export const fetchExecFile = async (fileName) => {
+    const response = await fetch(`${EXEC_API}/get/${fileName}`);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return randomString;
+    return response.blob();
 };
 
 export const getData = (path, cb) => fetch(`${path}`, {
