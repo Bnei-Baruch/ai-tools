@@ -1,16 +1,15 @@
-name: Deploy
+name: CI/CD
 
+# CI: every push and pull request is type-checked and built.
+# CD: a push to master (or a manual run on master) deploys that build to
+# https://ngx.kab.info/ai-tools/.
 on:
   push:
-    branches: [master]
+  pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: deploy
-  cancel-in-progress: false
-
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +20,8 @@ jobs:
           cache: yarn
 
       - run: yarn install --frozen-lockfile
+
+      - run: yarn typecheck
 
       # Vite reads REACT_APP_* from the environment; values live in the repo's Actions variables.
       # Keycloak settings fall back to the defaults in src/consts.js when unset.
@@ -37,6 +38,25 @@ jobs:
           REACT_APP_STT_URL: ${{ vars.REACT_APP_STT_URL }}
           REACT_APP_STT_MODEL: ${{ vars.REACT_APP_STT_MODEL }}
           REACT_APP_ALIGN_URL: ${{ vars.REACT_APP_ALIGN_URL }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: build/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: build/
 
       - name: Set up SSH
         run: |
