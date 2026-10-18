@@ -3,9 +3,10 @@ export const WEB_URL = import.meta.env.REACT_APP_WEB_URL;
 export const AI_BACKEND = import.meta.env.REACT_APP_AI_BACKEND;
 export const EXEC_API = import.meta.env.REACT_APP_EXEC_API;
 export const STT_API = import.meta.env.REACT_APP_STT_API;
-export const KEYCLOAK_URL = import.meta.env.REACT_APP_KEYCLOAK_URL;
-export const KEYCLOAK_REALM = import.meta.env.REACT_APP_KEYCLOAK_REALM;
-export const KEYCLOAK_CLIENT_ID = import.meta.env.REACT_APP_KEYCLOAK_CLIENT_ID;
+// Defaults so a build with an older .env still starts: new Keycloak() throws without them.
+export const KEYCLOAK_URL = import.meta.env.REACT_APP_KEYCLOAK_URL || 'https://accounts.kab.info/auth';
+export const KEYCLOAK_REALM = import.meta.env.REACT_APP_KEYCLOAK_REALM || 'main';
+export const KEYCLOAK_CLIENT_ID = import.meta.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'ai-tools';
 
 export const language_options = [
     { key: 'he', value: 'heb', flag: 'il', text: 'Hebrew' },
