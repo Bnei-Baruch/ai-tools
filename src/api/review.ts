@@ -1,6 +1,5 @@
 import { REVIEW_API, STT_API } from '../consts';
-import { kc } from './UserManager';
-import type { Chunk } from './transcribe';
+import { errorFrom, type Chunk } from './transcribe';
 
 // Formats: TASK-stt-review.md, "1. Данные". Server side: ../stt-api, /review/*.
 
@@ -94,28 +93,21 @@ const API = REVIEW_API || STT_API;
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
 
+// Requests as the תמלול page makes them (api/transcribe.ts): plain fetch, the URL resolved against the page,
+// no Authorization header (the server takes the reviewer from the path), JSON only when there is a body.
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (kc.token) headers.set('Authorization', `Bearer ${kc.token}`);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  const url = new URL(`${API}${path}`, window.location.href);
+  const headers = init.body ? { 'Content-Type': 'application/json' } : undefined;
   let res: Response;
   try {
-    res = await fetch(`${API}${path}`, { ...init, headers });
+    res = await fetch(url, { ...init, headers });
   } catch {
     throw new Error('השרת אינו זמין');
   }
   if (res.status === 404) throw new NotFoundError(path);
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    let detail = text;
-    try {
-      const parsed = JSON.parse(text).detail;
-      detail = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
-    } catch {
-      // not JSON, keep raw text
-    }
-    const message = `${res.status}${detail ? `: ${detail}` : ` ${res.statusText}`}`;
-    throw res.status === 409 ? new ConflictError(message) : new Error(message);
+    const error = await errorFrom(res);
+    throw res.status === 409 ? new ConflictError(error.message) : error;
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
