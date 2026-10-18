@@ -8,7 +8,8 @@
     "build": "vite build",
     "deploy": "vite build && rsync -av --progress build/ root@ngx.kab.info:/usr/share/angie/html/ai-tools/",
     "preview": "vite preview",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test 'src/**/*.test.ts'"
   },
   "keywords": [],
   "author": "",

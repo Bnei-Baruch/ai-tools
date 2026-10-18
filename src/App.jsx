@@ -13,7 +13,7 @@ const App = () => (
       <Route element={<Layout tools={TOOLS} />}>
         {enabledTools.map(({ path, element, keepAlive }) => (
           // keepAlive tools are rendered by Layout; the route only makes the URL valid
-          <Route key={path} path={path} element={keepAlive ? null : element} />
+          <Route key={path} path={`${path}/*`} element={keepAlive ? null : element} />
         ))}
         <Route path='*' element={<Navigate to={`/${enabledTools[0].path}`} replace />} />
       </Route>

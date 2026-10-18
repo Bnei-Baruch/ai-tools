@@ -7,7 +7,7 @@ import SttApiStatus from './SttApiStatus';
 // keepAlive tools are rendered here rather than by their route, so they survive navigation.
 const Layout = ({ tools }) => {
   const { pathname } = useLocation();
-  const active = tools.find((t) => !t.disabled && pathname === `/${t.path}`);
+  const active = tools.find((t) => !t.disabled && (pathname === `/${t.path}` || pathname.startsWith(`/${t.path}/`)));
   const [opened, setOpened] = useState(() => new Set());
 
   useEffect(() => {

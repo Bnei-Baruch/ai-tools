@@ -6,6 +6,9 @@ export const STT_API = import.meta.env.REACT_APP_STT_API;
 export const STT_URL = import.meta.env.REACT_APP_STT_URL;
 export const STT_MODEL = import.meta.env.REACT_APP_STT_MODEL;
 export const ALIGN_URL = import.meta.env.REACT_APP_ALIGN_URL;
+// STT review: the API (defaults to STT_API; "local" -- see api/review.ts) and the set reviewers open.
+export const REVIEW_API = import.meta.env.REACT_APP_REVIEW_API;
+export const REVIEW_SET = import.meta.env.REACT_APP_REVIEW_SET;
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.
 export const KEYCLOAK_URL = import.meta.env.REACT_APP_KEYCLOAK_URL || 'https://accounts.kab.info/auth';
 export const KEYCLOAK_REALM = import.meta.env.REACT_APP_KEYCLOAK_REALM || 'main';
