@@ -10,8 +10,10 @@ const Align = lazy(() => import('./pages/Align'));
 
 // To add a tool, add an entry here: it gets a route and a menu item.
 // disabled: shown greyed out in the menu, no route. sttApi: needs stt-api (shows its health in the menu).
+// keepAlive: once opened, stays mounted (hidden) while other tools are shown -- for pages that
+// hold a session (Keycloak init, MQTT connection, running job) and can't be remounted.
 export const TOOLS = [
-  { path: 'transcription', title: 'Transcription', element: <Transcription /> },
+  { path: 'transcription', title: 'Transcription', element: <Transcription />, keepAlive: true },
   { path: 'speakers', title: 'Speakers', element: <Speakers />, sttApi: true, disabled: true },
   { path: 'docdiff', title: 'Doc diff', element: <SttTool><DocDiff /></SttTool>, sttApi: true, disabled: true },
   { path: 'textdiff', title: 'Text diff', element: <TextDiff />, sttApi: true, disabled: true },
