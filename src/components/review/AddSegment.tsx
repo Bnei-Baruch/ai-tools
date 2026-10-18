@@ -12,7 +12,7 @@ interface Props {
   onCancel: () => void;
 }
 
-// A lesson link from kabbalahmedia.info -> the server transcribes the whole lesson -> it joins the shared list.
+// A lesson link from kabbalahmedia.info -> it joins the shared list; the page then transcribes it (useTranscriber).
 export default function AddSegment({ set, reviewer, onAdded, onCancel }: Props) {
   const [link, setLink] = useState('');
   const [loading, setLoading] = useState(false);
@@ -111,7 +111,7 @@ export default function AddSegment({ set, reviewer, onAdded, onCancel }: Props) 
           <button type="submit" className="btn btn--primary btn--block" disabled={loading || !!existing}>
             הוספה לרשימה ותמלול
           </button>
-          <p className="muted center">התמלול נעשה בשרת ולוקח כמה דקות; בינתיים אפשר לבדוק שיעורים אחרים.</p>
+          <p className="muted center">התמלול נעשה בדפדפן ולוקח כמה דקות; אל תסגרו את הדף עד שיסתיים. בינתיים אפשר לבדוק שיעורים אחרים.</p>
         </form>
       )}
     </div>

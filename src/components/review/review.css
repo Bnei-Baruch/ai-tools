@@ -14,6 +14,7 @@
   .review-segments { list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .review-segments li { display: flex; align-items: center; gap: 4px; }
   .review-segments__delete { opacity: .5; }
+  .review-segments__transcribe { flex-shrink: 0; padding: 4px 10px; font-size: .8rem; }
   .review-segments__delete:hover { opacity: 1; }
   .review-segments__item {
     width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px;
@@ -85,16 +86,38 @@
 
   /* Instructions */
   .review-modal {
-    position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-start; justify-content: center;
-    padding: 40px 16px; overflow-y: auto; background: rgba(0,0,0,.4);
+    position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px; background: rgba(0,0,0,.4);
   }
-  .review-modal__box { max-width: 640px; width: 100%; background: var(--surface); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); }
-  .review-modal__box h2, .review-modal__box h3 { font-family: inherit; margin: 0 0 12px; }
-  .review-modal__box h3 { margin-top: 20px; margin-bottom: 4px; }
-  .review-help { padding-inline-start: 20px; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-  .review-help__cats { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
-  .review-keys { border-collapse: collapse; margin-top: 8px; }
-  .review-keys td { padding: 3px 8px; }
+  .review-modal__box {
+    display: flex; flex-direction: column; width: 100%; max-width: 920px; max-height: 100%;
+    background: var(--surface); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.2);
+  }
+  .review-modal__header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+  }
+  .review-modal__header h2 { margin: 0; font-family: inherit; font-size: 1.3rem; }
+  .review-modal__body {
+    display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px;
+    padding: 20px 24px; overflow-y: auto;
+  }
+  .review-modal__footer { padding: 12px 24px 20px; border-top: 1px solid var(--border); }
+  .review-modal__footer .btn--block { margin-top: 0; }
+  .review-help { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .review-help__cats { margin: 8px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: start; }
+  .review-help__cats > div { display: contents; }
+  .review-help__cats dt .rcat { cursor: default; white-space: nowrap; }
+  .review-help__cats dd { margin: 0; font-size: .9rem; line-height: 1.4; }
+  .review-help__cats dd .muted { display: block; font-size: .8rem; }
+  .review-help__keys h3 { margin: 0 0 8px; font-family: inherit; font-size: 1rem; }
+  .review-keys { border-collapse: collapse; font-size: .9rem; }
+  .review-keys td { padding: 4px 0; vertical-align: top; }
+  .review-keys td:first-child { padding-inline-end: 12px; white-space: nowrap; }
+  .review-help__keys .muted { margin-top: 8px; font-size: .85rem; }
+  @media (max-width: 800px) {
+    .review-modal__body { grid-template-columns: 1fr; }
+  }
   kbd {
     display: inline-block; padding: 0 6px; font: inherit; font-size: .8rem;
     border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg);

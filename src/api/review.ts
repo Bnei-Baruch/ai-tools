@@ -1,6 +1,6 @@
 import { REVIEW_API, STT_API } from '../consts';
 import { kc } from './UserManager';
-import { transcribe, type Chunk } from './transcribe';
+import type { Chunk } from './transcribe';
 
 // Formats: TASK-stt-review.md, "1. Данные". Server side: ../stt-api, /review/*.
 
@@ -29,8 +29,8 @@ export interface ReviewSegment {
 
 export type SegmentStatus = 'pending' | 'ready' | 'failed';
 
-// POST /review/sets/{set_id}/segments: the server builds the CDN URLs from the file ids,
-// runs the model on the whole lesson in the background and adds it to the set.
+// POST /review/sets/{set_id}/segments: the server builds the CDN URLs from the file ids and adds the
+// lesson to the set as "pending"; the browser then transcribes it (see uploadTranscript).
 export interface NewSegment {
   unit_uid: string;
   title: string;
@@ -87,6 +87,7 @@ export const REVIEW_LOCAL = REVIEW_API === 'local';
 const API = REVIEW_API || STT_API;
 
 export class NotFoundError extends Error {}
+export class ConflictError extends Error {}
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -108,7 +109,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // not JSON, keep raw text
     }
-    throw new Error(`${res.status}${detail ? `: ${detail}` : ` ${res.statusText}`}`);
+    const message = `${res.status}${detail ? `: ${detail}` : ` ${res.statusText}`}`;
+    throw res.status === 409 ? new ConflictError(message) : new Error(message);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -151,7 +153,6 @@ function saveLocalAdded(setId: string, segment: ReviewSegment) {
   localStorage.setItem(addedKey(setId), JSON.stringify([...others, segment]));
 }
 
-// Local mode transcribes in the browser, through STT_URL (as the תמלול page does).
 async function localAddSegment(setId: string, req: NewSegment): Promise<ReviewSegment> {
   const segment: ReviewSegment = {
     id: req.unit_uid,
@@ -169,13 +170,17 @@ async function localAddSegment(setId: string, req: NewSegment): Promise<ReviewSe
   saveLocalAdded(setId, segment);
   // re-adding a deleted lesson brings it back
   localStorage.setItem(deletedKey(setId), JSON.stringify(localDeleted(setId).filter((id) => id !== segment.id)));
-  transcribe(segment.media_url).then(
-    ({ chunks }) => saveLocalAdded(setId, {
-      ...segment, chunks, end: Math.max(req.duration, chunks.at(-1)?.end ?? 0), status: 'ready',
-    }),
-    (e) => saveLocalAdded(setId, { ...segment, status: 'failed', error: e instanceof Error ? e.message : String(e) }),
-  );
   return segment;
+}
+
+function localUploadTranscript(setId: string, segmentId: string, body: TranscriptUpload): ReviewSegment {
+  const segment = localAdded(setId).find((s) => s.id === segmentId);
+  if (!segment) throw new NotFoundError(segmentId);
+  const updated: ReviewSegment = body.chunks
+    ? { ...segment, chunks: body.chunks, end: Math.max(segment.end, body.chunks.at(-1)?.end ?? 0), status: 'ready', error: undefined }
+    : { ...segment, status: 'failed', error: body.error };
+  saveLocalAdded(setId, updated);
+  return updated;
 }
 
 const LOCAL_PREFIX = 'review-local:';
@@ -222,7 +227,25 @@ export async function putResult(result: ReviewResult, { keepalive = false } = {}
   });
 }
 
-// -> the new segment, status "pending"; poll getSet() until it is "ready" (or "failed").
+// The model's transcript of the whole lesson (made in the browser: the server can't reach the STT service),
+// or the error if transcription failed. model: the set's model, the one STT_URL is expected to serve.
+export interface TranscriptUpload {
+  reviewer: string;
+  model: string;
+  chunks?: Chunk[];
+  error?: string;
+}
+
+// -> the segment, "ready" (or "failed"). 409: it is already ready -- someone else transcribed it first.
+export async function uploadTranscript(setId: string, segmentId: string, body: TranscriptUpload): Promise<ReviewSegment> {
+  if (REVIEW_LOCAL) return localUploadTranscript(setId, segmentId, body);
+  return call(`/review/sets/${encodeURIComponent(setId)}/segments/${encodeURIComponent(segmentId)}/transcript`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+// -> the new segment, status "pending": the client then transcribes it and calls uploadTranscript().
 export async function addSegment(setId: string, req: NewSegment): Promise<ReviewSegment> {
   if (REVIEW_LOCAL) return localAddSegment(setId, req);
   return call(`/review/sets/${encodeURIComponent(setId)}/segments`, { method: 'POST', body: JSON.stringify(req) });

@@ -4,6 +4,7 @@ import { REVIEW_SET } from '../consts';
 import { getUser, kc } from '../api/UserManager';
 import { deleteSegment, getAllResults, getReviewerResults, getSet, NotFoundError, REVIEW_LOCAL, type ReviewResult, type ReviewSegment, type ReviewSet } from '../api/review';
 import { readDraft, resendDraft } from '../review/useReviewSaver';
+import useTranscriber from '../review/useTranscriber';
 import ErrorAlert from '../components/stt/ErrorAlert';
 import AddSegment from '../components/review/AddSegment';
 import Instructions from '../components/review/Instructions';
@@ -84,6 +85,11 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
   const [othersStarted, setOthersStarted] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
+  const replaceSegment = useCallback((segment: ReviewSegment) => setSet((prev) => prev && {
+    ...prev, segments: [...prev.segments.filter((s) => s.id !== segment.id), segment],
+  }), []);
+  const reloadSet = useCallback(() => getSet(setId).then(setSet, () => {}), [setId]);
+  const transcriber = useTranscriber(setId, reviewer.id, replaceSegment, reloadSet);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +186,8 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
               onOpen={open}
               onAdd={() => navigate(`${base}/new`)}
               onDelete={remove}
+              transcribing={transcriber.running}
+              onTranscribe={(segment) => transcriber.run(segment, set.model)}
               onHelp={() => setHelp(true)}
             />
           )}
@@ -191,7 +199,8 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
               set={set}
               reviewer={reviewer}
               onAdded={(segment) => {
-                setSet((prev) => prev && { ...prev, segments: [...prev.segments.filter((s) => s.id !== segment.id), segment] });
+                replaceSegment(segment);
+                void transcriber.run(segment, set.model);
                 navigate(base);
               }}
               onCancel={() => navigate(base)}
