@@ -25,6 +25,10 @@ export interface ReviewSegment {
   unit_uid?: string;
   added_by?: string;
   added_by_name?: string;
+  // the model that made this lesson's transcript -- the one its results are about
+  model?: string;
+  transcribed_by?: string;
+  transcribed_at?: string;
 }
 
 export type SegmentStatus = 'pending' | 'ready' | 'failed';
@@ -44,6 +48,7 @@ export interface NewSegment {
 
 export interface ReviewSet {
   id: string;
+  // the model new lessons are transcribed with; each lesson keeps its own (segment.model)
   model: string;
   baseline_model?: string;
   // shared by all reviewers, who pick segments themselves (and add new ones)

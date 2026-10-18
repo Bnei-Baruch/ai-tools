@@ -90,3 +90,10 @@ test('toCsv quotes cells with commas and quotes', () => {
   assert.equal(lines.length, 4);
   assert.ok(lines[2].includes('"two, ""quoted"""'));
 });
+
+test('toCsv takes the model from the lesson first', () => {
+  const withModel: ReviewSet = { ...set, segments: [{ ...set.segments[0], model: 'lesson-model' }, set.segments[1]] };
+  const lines = toCsv(withModel, rows(withModel, results)).trim().split('\n');
+  assert.ok(lines[1].startsWith('set1,lesson-model,'));
+  assert.ok(lines[2].startsWith('set1,m1,'));
+});

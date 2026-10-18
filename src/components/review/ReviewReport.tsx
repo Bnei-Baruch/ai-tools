@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getAllResults, type AllResults } from '../../api/review';
-import { byCategory, disagreements, progress, rows, summarize, toCsv, type Summary } from '../../review/report';
+import { byCategory, disagreements, modelOf, progress, rows, summarize, toCsv, type Summary } from '../../review/report';
 import { saveBlob } from '../../utils';
 import ErrorAlert from '../stt/ErrorAlert';
 import { formatClock } from './format';
@@ -45,7 +45,8 @@ export default function ReviewReport() {
       categories: byCategory(data.set, rs),
       disagreements: disagreements(rs),
       progress: progress(data.set, data.results),
-      otherModels: [...new Set(data.results.map((r) => r.model).filter((m) => m && m !== data.set.model))],
+      // models of the finished lessons; the metrics mix them if there is more than one
+      models: [...new Set(rs.map((r) => modelOf(data.set, r.segment, r.result)))],
     };
   }, [data]);
 
@@ -61,7 +62,7 @@ export default function ReviewReport() {
           <div>
             <h1>תוצאות בדיקת תמלול</h1>
             <p className="muted" dir="ltr">
-              {set.id} · model: <b>{set.model}</b>{set.baseline_model && <> · baseline: {set.baseline_model}</>}
+              model: <b>{report.models.join(', ') || set.model}</b>{set.baseline_model && <> · baseline: {set.baseline_model}</>}
             </p>
           </div>
           <span className="transcript__actions">
@@ -75,8 +76,10 @@ export default function ReviewReport() {
             </button>
           </span>
         </header>
-        {report.otherModels.length > 0 && (
-          <div className="alert alert--warn">יש תוצאות של מודל אחר: <span dir="ltr">{report.otherModels.join(', ')}</span></div>
+        {report.models.length > 1 && (
+          <div className="alert alert--warn">
+            השיעורים תומללו בכמה מודלים: <span dir="ltr">{report.models.join(', ')}</span>. הסיכום מערבב אותם; לפילוח — CSV, עמודת model.
+          </div>
         )}
 
         <h2>התקדמות</h2>

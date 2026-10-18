@@ -4,6 +4,10 @@ import { werCounts } from './wer.ts';
 
 // The report (TASK-stt-review.md, "3. Экран результатов"). Only `done` results count in the metrics.
 
+// The model a result is about: the lesson's own, else what the result or the set recorded.
+export const modelOf = (set: ReviewSet, segment: ReviewSegment, result?: ReviewResult) =>
+  segment.model || result?.model || set.model;
+
 export const segmentMinutes = (s: Pick<ReviewSegment, 'start' | 'end'>) => (s.end - s.start) / 60;
 
 // A chunk counts as changed when its text differs from the model's, whatever the category says.
@@ -163,7 +167,7 @@ export function toCsv(set: ReviewSet, rs: Row[]): string {
     'active_seconds', 'updated_at',
   ];
   const lines = rs.map((r) => [
-    set.id, r.result.model || set.model, set.baseline_model ?? '', r.segment.id, r.segment.title, r.segment.category ?? '',
+    set.id, modelOf(set, r.segment, r.result), set.baseline_model ?? '', r.segment.id, r.segment.title, r.segment.category ?? '',
     r.minutes.toFixed(2), r.result.reviewer, r.result.reviewer_name, r.a, r.b, r.c, r.changed, r.segment.chunks.length,
     r.wer.words, (r.wer.words ? r.wer.errors / r.wer.words : 0).toFixed(4),
     r.baselineWer ? (r.baselineWer.words ? r.baselineWer.errors / r.baselineWer.words : 0).toFixed(4) : '',
