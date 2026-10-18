@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ command, isPreview }) => ({
   plugins: [react()],
+  // Deployed under https://ngx.kab.info/ai-tools/; the dev server stays at /
+  base: command === 'build' || isPreview ? '/ai-tools/' : '/',
   envPrefix: 'REACT_APP_',
   server: {
     port: 3000,
@@ -13,4 +15,4 @@ export default defineConfig({
     // lightningcss rejects an invalid selector in semantic-ui-css
     cssMinify: 'esbuild',
   },
-});
+}));

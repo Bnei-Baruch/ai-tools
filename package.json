@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "build": "vite build",
-    "deploy": "vite build && scripts/deploy.sh",
+    "deploy": "vite build && rsync -av --progress build/ root@ngx.kab.info:/usr/share/angie/html/ai-tools/",
     "preview": "vite preview",
     "typecheck": "tsc"
   },

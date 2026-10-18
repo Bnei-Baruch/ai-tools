@@ -1,0 +1,53 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      # Vite reads REACT_APP_* from the environment; values live in the repo's Actions variables.
+      # Keycloak settings fall back to the defaults in src/consts.js when unset.
+      - run: yarn build
+        env:
+          REACT_APP_MQTT_URL: ${{ vars.REACT_APP_MQTT_URL }}
+          REACT_APP_WEB_URL: ${{ vars.REACT_APP_WEB_URL }}
+          REACT_APP_AI_BACKEND: ${{ vars.REACT_APP_AI_BACKEND }}
+          REACT_APP_EXEC_API: ${{ vars.REACT_APP_EXEC_API }}
+          REACT_APP_KEYCLOAK_URL: ${{ vars.REACT_APP_KEYCLOAK_URL }}
+          REACT_APP_KEYCLOAK_REALM: ${{ vars.REACT_APP_KEYCLOAK_REALM }}
+          REACT_APP_KEYCLOAK_CLIENT_ID: ${{ vars.REACT_APP_KEYCLOAK_CLIENT_ID }}
+          REACT_APP_STT_API: ${{ vars.REACT_APP_STT_API }}
+          REACT_APP_STT_URL: ${{ vars.REACT_APP_STT_URL }}
+          REACT_APP_STT_MODEL: ${{ vars.REACT_APP_STT_MODEL }}
+          REACT_APP_ALIGN_URL: ${{ vars.REACT_APP_ALIGN_URL }}
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # ssh-keyscan ngx.kab.info
+          cat >> ~/.ssh/known_hosts <<'EOF'
+          ngx.kab.info ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDWoETL4o1h0Jfy8Iotq0FMHCEeOICgr4IHAFbACQSro
+          ngx.kab.info ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMF7krGEChzELXEpRLepaIsMEPftKWFx9JtuwPwiVnu5SqSX1Ra9kdDmxx3V74fJj6wgdJGJV8jYcxN1MDYb+ss=
+          EOF
+
+      - name: Deploy
+        run: rsync -av -e "ssh -i ~/.ssh/id_deploy" build/ root@ngx.kab.info:/usr/share/angie/html/ai-tools/

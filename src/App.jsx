@@ -23,7 +23,7 @@ const TOOLS = [
 ];
 
 const App = () => (
-  <BrowserRouter>
+  <BrowserRouter basename={import.meta.env.BASE_URL}>
     <Routes>
       <Route element={<Layout tools={TOOLS} />}>
         {TOOLS.map(({ path, element }) => (
