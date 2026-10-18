@@ -9,6 +9,19 @@ import ErrorAlert from '../components/stt/ErrorAlert';
 import VideoPlayer from '../components/stt/VideoPlayer';
 import ChunkList from '../components/stt/ChunkList';
 
+const SAFE_MEDIA_PROTOCOLS = new Set(['http:', 'https:', 'blob:']);
+
+function sanitizeMediaUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    return SAFE_MEDIA_PROTOCOLS.has(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
 export default function Stt() {
   const [url, setUrl] = useState('https://cdn.kabbalahmedia.info/K8X56H7k');
   const [videoUrl, setVideoUrl] = useState('https://cdn.kabbalahmedia.info/cADzhBzb');
@@ -20,8 +33,8 @@ export default function Stt() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const elapsed = useElapsed(loading);
 
-  const trimmedUrl = url.trim();
-  const trimmedVideoUrl = videoUrl.trim();
+  const trimmedUrl = sanitizeMediaUrl(url);
+  const trimmedVideoUrl = sanitizeMediaUrl(videoUrl);
   // The transcribed URL drives the player by default; the video field (once a
   // transcript exists) lets the user swap in an actual video to watch with
   // the same subtitles.
