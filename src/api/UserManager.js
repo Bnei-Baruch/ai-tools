@@ -1,6 +1,6 @@
 import Keycloak from 'keycloak-js';
 import mqtt from "./mqtt";
-import {KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID} from "./consts";
+import {KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID} from "../consts";
 
 const userManagerConfig = {
     url: KEYCLOAK_URL,

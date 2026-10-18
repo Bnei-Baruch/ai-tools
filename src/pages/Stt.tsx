@@ -1,25 +1,24 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { STT_MODEL } from '../config/config';
-import { chunksToVtt, formatTimestamp, transcribe, type SttResult } from '../api/transcribe';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { STT_MODEL } from '../consts';
+import { chunksToVtt, transcribe, type SttResult } from '../api/transcribe';
+import { formatElapsed } from '../utils';
+import useElapsed from '../hooks/useElapsed';
+import useObjectUrl from '../hooks/useObjectUrl';
+import BusyButton from '../components/stt/BusyButton';
+import ErrorAlert from '../components/stt/ErrorAlert';
+import VideoPlayer from '../components/stt/VideoPlayer';
+import ChunkList from '../components/stt/ChunkList';
 
-function formatElapsed(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-export default function SttPage() {
+export default function Stt() {
   const [url, setUrl] = useState('https://cdn.kabbalahmedia.info/K8X56H7k');
   const [videoUrl, setVideoUrl] = useState('https://cdn.kabbalahmedia.info/cADzhBzb');
   const [loading, setLoading] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SttResult | null>(null);
-  const [subtitles, setSubtitles] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [marked, setMarked] = useState<Set<number>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
-  const activeRef = useRef<HTMLLIElement>(null);
+  const elapsed = useElapsed(loading);
 
   const trimmedUrl = url.trim();
   const trimmedVideoUrl = videoUrl.trim();
@@ -28,46 +27,13 @@ export default function SttPage() {
   // the same subtitles.
   const playerSrc = trimmedVideoUrl || trimmedUrl;
 
-  const trackUrl = useMemo(() => {
-    if (!result?.chunks?.length) return null;
-    return URL.createObjectURL(new Blob([chunksToVtt(result.chunks)], { type: 'text/vtt' }));
-  }, [result]);
-
-  useEffect(() => {
-    if (trackUrl) return () => URL.revokeObjectURL(trackUrl);
-  }, [trackUrl]);
-
-  const srtUrl = useMemo(() => {
-    if (!result?.srt) return null;
-    return URL.createObjectURL(new Blob([result.srt], { type: 'application/x-subrip' }));
-  }, [result]);
-
-  useEffect(() => {
-    if (srtUrl) return () => URL.revokeObjectURL(srtUrl);
-  }, [srtUrl]);
-
-  // <track default> is only honored on load, so toggle the text track mode directly.
-  useEffect(() => {
-    const track = videoRef.current?.textTracks[0];
-    if (track) track.mode = subtitles ? 'showing' : 'hidden';
-  }, [subtitles, trackUrl]);
-
-  useEffect(() => {
-    if (!loading) return;
-    setElapsed(0);
-    const started = Date.now();
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [loading]);
+  const trackUrl = useObjectUrl(result?.chunks?.length ? chunksToVtt(result.chunks) : null, 'text/vtt');
+  const srtUrl = useObjectUrl(result?.srt, 'application/x-subrip');
 
   const activeIndex = useMemo(
     () => result?.chunks.findIndex((c) => currentTime >= c.start && currentTime < c.end) ?? -1,
     [result, currentTime],
   );
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [activeIndex]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -143,24 +109,17 @@ export default function SttPage() {
             />
           </div>
 
-          <button type="submit" className="btn btn--primary btn--block" disabled={!trimmedUrl || loading}>
-            {loading ? (
-              <>
-                <span className="spinner" aria-hidden />
-                מתמלל… {formatElapsed(elapsed)}
-              </>
-            ) : (
-              'תמלל'
-            )}
-          </button>
-          {loading && <p className="muted center">התמלול עשוי להימשך מספר דקות, אל תסגרו את הדף.</p>}
+          <BusyButton
+            loading={loading}
+            disabled={!trimmedUrl}
+            busyText={`מתמלל… ${formatElapsed(elapsed)}`}
+            note="התמלול עשוי להימשך מספר דקות, אל תסגרו את הדף."
+          >
+            תמלל
+          </BusyButton>
         </form>
 
-        {error && (
-          <div className="alert alert--error" role="alert">
-            <strong>שגיאה:</strong> <span dir="auto">{error}</span>
-          </div>
-        )}
+        <ErrorAlert error={error} />
 
         {result && (
           <div className="field">
@@ -180,28 +139,13 @@ export default function SttPage() {
 
       {playerSrc && (
         <section className="stt">
-          <div className="player">
-            <video
-              ref={videoRef}
-              key={playerSrc + '|' + (trackUrl ?? '')}
-              src={playerSrc}
-              controls
-              crossOrigin="anonymous"
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => {
-                const track = e.currentTarget.textTracks[0];
-                if (track) track.mode = subtitles ? 'showing' : 'hidden';
-              }}
-            >
-              {trackUrl && <track kind="subtitles" label={STT_MODEL} srcLang="he" src={trackUrl} default />}
-            </video>
-            {trackUrl && (
-              <label className="player__toggle">
-                <input type="checkbox" checked={subtitles} onChange={(e) => setSubtitles(e.target.checked)} />
-                כתוביות
-              </label>
-            )}
-          </div>
+          <VideoPlayer
+            src={playerSrc}
+            trackUrl={trackUrl}
+            trackLabel={STT_MODEL}
+            videoRef={videoRef}
+            onTimeUpdate={setCurrentTime}
+          />
 
           <div className="transcript">
             <div className="transcript__header">
@@ -228,26 +172,13 @@ export default function SttPage() {
               <p className="transcript__text" dir="auto">{result.text || 'לא זוהה דיבור'}</p>
             )}
             {result && result.chunks.length > 0 && (
-              <ol className="chunks">
-                {result.chunks.map((c, i) => (
-                  <li
-                    key={i}
-                    ref={i === activeIndex ? activeRef : undefined}
-                    className={i === activeIndex ? 'chunk chunk--active' : 'chunk'}
-                    onClick={() => seek(c.start)}
-                  >
-                    <input
-                      type="checkbox"
-                      className="chunk__mark"
-                      checked={marked.has(i)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleMarked(i)}
-                    />
-                    <span className="chunk__ts">{formatTimestamp(c.start)}</span>
-                    <span dir="auto">{c.text}</span>
-                  </li>
-                ))}
-              </ol>
+              <ChunkList
+                chunks={result.chunks}
+                activeIndex={activeIndex}
+                marked={marked}
+                onSeek={seek}
+                onToggleMark={toggleMarked}
+              />
             )}
           </div>
         </section>

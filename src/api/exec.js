@@ -1,26 +1,5 @@
-import {EXEC_API} from "./consts";
+import {EXEC_API} from "../consts";
 import {kc} from "./UserManager";
-
-export const randomString = (len) => {
-    let charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let randomString = "";
-    for (let i = 0; i < len; i++) {
-        let randomPoz = Math.floor(Math.random() * charSet.length);
-        randomString += charSet.substring(randomPoz, randomPoz + 1);
-    }
-    return randomString;
-};
-
-export const saveBlob = (blob, fileName) => {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-};
 
 // Result files of the exec-api services (e.g. output.srt).
 export const fetchExecFile = async (fileName) => {

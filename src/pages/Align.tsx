@@ -1,50 +1,28 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import FileDrop from '../components/FileDrop';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { alignWords, chunksToSrt, segmentsFromWords, wordsToSrt, type AlignResult } from '../api/alignWords';
-import { formatTimestamp } from '../api/transcribe';
+import { formatElapsed } from '../utils';
+import useElapsed from '../hooks/useElapsed';
+import useObjectUrl from '../hooks/useObjectUrl';
+import FileDrop from '../components/stt/FileDrop';
+import BusyButton from '../components/stt/BusyButton';
+import ErrorAlert from '../components/stt/ErrorAlert';
+import AlignedWords from '../components/stt/AlignedWords';
 
 const isSrt = (f: File) => /\.srt$/i.test(f.name) || f.type === 'application/x-subrip';
 const isAudio = (f: File) =>
   f.type.startsWith('audio/') || f.type.startsWith('video/') || /\.(mp3|wav|m4a|ogg|oga|flac|aac|webm|opus|mp4)$/i.test(f.name);
 
-function formatElapsed(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function useObjectUrl(content: string | null, type: string): string | null {
-  const url = useMemo(() => (content == null ? null : URL.createObjectURL(new Blob([content], { type }))), [content, type]);
-  useEffect(() => {
-    if (url) return () => URL.revokeObjectURL(url);
-  }, [url]);
-  return url;
-}
-
-export default function AlignPage() {
+export default function Align() {
   const [srt, setSrt] = useState<File | null>(null);
   const [audio, setAudio] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AlignResult | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const activeRef = useRef<HTMLSpanElement>(null);
+  const elapsed = useElapsed(loading);
 
-  useEffect(() => {
-    if (!loading) return;
-    setElapsed(0);
-    const started = Date.now();
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [loading]);
-
-  const audioUrl = useMemo(() => (audio ? URL.createObjectURL(audio) : null), [audio]);
-  useEffect(() => {
-    if (audioUrl) return () => URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
-
+  const audioUrl = useObjectUrl(audio);
   const baseName = srt?.name.replace(/\.srt$/i, '') ?? 'aligned';
   const wordsSrtUrl = useObjectUrl(result ? wordsToSrt(result.words) : null, 'application/x-subrip');
   const segmentsSrtUrl = useObjectUrl(
@@ -53,22 +31,10 @@ export default function AlignPage() {
   );
   const jsonUrl = useObjectUrl(result ? JSON.stringify({ words: result.words }, null, 2) : null, 'application/json');
 
-  // Words grouped under their source segment, keeping the global word index for highlighting.
-  const groups = useMemo(() => {
-    if (!result) return [];
-    const bySegment = result.segments.map(() => [] as { index: number; word: string; start: number }[]);
-    result.words.forEach((w, index) => bySegment[w.segment_index]?.push({ index, word: w.word, start: w.start }));
-    return result.segments.map((seg, i) => ({ start: seg.start, text: seg.text, words: bySegment[i] }));
-  }, [result]);
-
   const activeIndex = useMemo(
     () => result?.words.findIndex((w) => currentTime >= w.start && currentTime < w.end) ?? -1,
     [result, currentTime],
   );
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [activeIndex]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -122,24 +88,12 @@ export default function AlignPage() {
             disabled={loading}
           />
 
-          <button type="submit" className="btn btn--primary btn--block" disabled={!srt || !audio || loading}>
-            {loading ? (
-              <>
-                <span className="spinner" aria-hidden />
-                מעבד… {formatElapsed(elapsed)}
-              </>
-            ) : (
-              'שלח לעיבוד'
-            )}
-          </button>
-          {loading && <p className="muted center">העיבוד עשוי להימשך מספר דקות, אל תסגרו את הדף.</p>}
+          <BusyButton loading={loading} disabled={!srt || !audio} busyText={`מעבד… ${formatElapsed(elapsed)}`}>
+            שלח לעיבוד
+          </BusyButton>
         </form>
 
-        {error && (
-          <div className="alert alert--error" role="alert">
-            <strong>שגיאה:</strong> <span dir="auto">{error}</span>
-          </div>
-        )}
+        <ErrorAlert error={error} />
       </div>
 
       {result && (
@@ -179,32 +133,7 @@ export default function AlignPage() {
             {result.words.length === 0 ? (
               <div className="transcript__empty">לא התקבלו מילים</div>
             ) : (
-              <ol className="chunks">
-                {groups.map((g, i) => (
-                  <li key={i} className="chunk" onClick={() => seek(g.words[0]?.start ?? g.start)}>
-                    <span className="chunk__ts">{formatTimestamp(g.words[0]?.start ?? g.start)}</span>
-                    <span dir="auto">
-                      {g.words.length === 0
-                        ? g.text
-                        : g.words.map((w) => (
-                            <Fragment key={w.index}>
-                              <span
-                                ref={w.index === activeIndex ? activeRef : undefined}
-                                className={w.index === activeIndex ? 'word word--active' : 'word'}
-                                title={formatTimestamp(w.start)}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  seek(w.start);
-                                }}
-                              >
-                                {w.word}
-                              </span>{' '}
-                            </Fragment>
-                          ))}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <AlignedWords result={result} activeIndex={activeIndex} onSeek={seek} />
             )}
           </div>
         </section>

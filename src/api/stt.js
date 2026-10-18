@@ -1,4 +1,4 @@
-import {STT_API} from "./consts";
+import {STT_API} from "../consts";
 import {kc} from "./UserManager";
 
 // Cloudflare rejects request bodies above 100 MB.

@@ -1,4 +1,4 @@
-import { STT_URL } from '../config/config';
+import { STT_URL } from '../consts';
 
 export interface Chunk {
   start: number;

@@ -1,4 +1,4 @@
-import { ALIGN_URL } from '../config/config';
+import { ALIGN_URL } from '../consts';
 import { parseSrt, type Chunk } from './transcribe';
 
 export interface Word {

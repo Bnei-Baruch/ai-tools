@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { renderAsync } from 'docx-preview';
-import FileDrop from '../components/FileDrop';
-import { docdiffCompare, MAX_UPLOAD_SIZE } from '../../AITools/stt';
-import { saveBlob } from '../../AITools/tools';
+import { useState, type FormEvent } from 'react';
+import { docdiffCompare, MAX_UPLOAD_SIZE } from '../api/stt';
+import { formatElapsed, saveBlob } from '../utils';
+import useElapsed from '../hooks/useElapsed';
+import FileDrop from '../components/stt/FileDrop';
+import BusyButton from '../components/stt/BusyButton';
+import ErrorAlert from '../components/stt/ErrorAlert';
+import DocxPreview from '../components/stt/DocxPreview';
 
 interface DocdiffResult {
   blob: Blob;
@@ -15,53 +18,14 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 const isDocx = (f: File) => /\.docx$/i.test(f.name) || f.type === DOCX_MIME;
 const isAudio = (f: File) => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|oga|flac|aac|webm|opus)$/i.test(f.name);
 
-function formatElapsed(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-export default function UploadPage() {
+export default function DocDiff() {
   const [doc, setDoc] = useState<File | null>(null);
   const [audio, setAudio] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [upload, setUpload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DocdiffResult | null>(null);
-  const [rendering, setRendering] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!loading) return;
-    setElapsed(0);
-    const started = Date.now();
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [loading]);
-
-  useEffect(() => {
-    const container = previewRef.current;
-    if (!result || !container) return;
-    let cancelled = false;
-    container.innerHTML = '';
-    setRendering(true);
-    setPreviewError(null);
-    renderAsync(result.blob, container, undefined, {
-      inWrapper: true,
-      breakPages: true,
-      ignoreLastRenderedPageBreak: true,
-    })
-      .then(() => {
-        if (!cancelled) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      })
-      .catch((err) => !cancelled && setPreviewError(err instanceof Error ? err.message : String(err)))
-      .finally(() => !cancelled && setRendering(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [result]);
+  const elapsed = useElapsed(loading);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -121,24 +85,16 @@ export default function UploadPage() {
             warnSize={MAX_UPLOAD_SIZE}
           />
 
-          <button type="submit" className="btn btn--primary btn--block" disabled={!doc || !audio || loading}>
-            {loading ? (
-              <>
-                <span className="spinner" aria-hidden />
-                {upload < 100 ? `מעלה… ${upload}%` : `מעבד… ${formatElapsed(elapsed)}`}
-              </>
-            ) : (
-              'שלח לעיבוד'
-            )}
-          </button>
-          {loading && <p className="muted center">העיבוד עשוי להימשך מספר דקות, אל תסגרו את הדף.</p>}
+          <BusyButton
+            loading={loading}
+            disabled={!doc || !audio}
+            busyText={upload < 100 ? `מעלה… ${upload}%` : `מעבד… ${formatElapsed(elapsed)}`}
+          >
+            שלח לעיבוד
+          </BusyButton>
         </form>
 
-        {error && (
-          <div className="alert alert--error" role="alert">
-            <strong>שגיאה:</strong> <span dir="auto">{error}</span>
-          </div>
-        )}
+        <ErrorAlert error={error} />
       </div>
 
       {result && (
@@ -162,17 +118,7 @@ export default function UploadPage() {
             </div>
           </div>
 
-          {rendering && (
-            <div className="preview__status">
-              <span className="spinner spinner--dark" aria-hidden /> טוען תצוגה מקדימה…
-            </div>
-          )}
-          {previewError && (
-            <div className="alert alert--warn">
-              לא ניתן להציג תצוגה מקדימה ({previewError}). הקובץ עצמו נשמר ואפשר לפתוח אותו ב-Word.
-            </div>
-          )}
-          <div className="preview__pages" ref={previewRef} />
+          <DocxPreview blob={result.blob} />
         </section>
       )}
     </>

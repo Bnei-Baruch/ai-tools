@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
-import {kc,getUser} from './UserManager';
-import {KEYCLOAK_URL, KEYCLOAK_REALM} from './consts';
+import {kc,getUser} from '../api/UserManager';
+import {KEYCLOAK_URL, KEYCLOAK_REALM} from '../consts';
 import { Container, Message, Button, Dropdown } from 'semantic-ui-react';
 
 class LoginPage extends Component {

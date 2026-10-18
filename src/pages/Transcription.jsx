@@ -1,12 +1,13 @@
 import React, { Component, Fragment } from 'react';
-import { Progress,Message,Button,Input,Form,Segment,Header,Dropdown } from 'semantic-ui-react';
-import Upload from 'rc-upload';
-import { Link } from 'react-router-dom';
-import LoginPage from './LoginPage';
-import {kc} from "./UserManager";
-import mqtt from "./mqtt";
-import {AI_BACKEND} from "./consts";
-import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile, saveBlob} from "./tools";
+import { Progress,Message,Button } from 'semantic-ui-react';
+import LoginPage from '../components/LoginPage';
+import MediaSource from '../components/transcription/MediaSource';
+import TranscriptionResults from '../components/transcription/TranscriptionResults';
+import TranscriptionSettings from '../components/transcription/TranscriptionSettings';
+import {kc} from "../api/UserManager";
+import mqtt from "../api/mqtt";
+import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile} from "../api/exec";
+import {saveBlob} from "../utils";
 
 class Transcription extends Component {
 
@@ -25,17 +26,6 @@ class Transcription extends Component {
         language: 'he', // default to Hebrew
         configLoading: false,
         stButton: false,
-        formatOptions: [
-            { key: 'txt', value: 'txt', text: '--txt (text file)' },
-            { key: 'srt', value: 'srt', text: '--srt (subtitles)' }
-        ],
-        languageOptions: [
-            { key: 'he', value: 'he', text: 'Hebrew (V3)' },
-            { key: 'he_bb', value: 'he_bb', text: 'Hebrew (BB)' },
-            { key: 'en', value: 'en', text: 'English' },
-            { key: 'ru', value: 'ru', text: 'Russian' },
-            { key: 'auto', value: 'auto', text: 'Autodetect' }
-        ]
     };
 
     componentDidMount() {
@@ -209,47 +199,17 @@ class Transcription extends Component {
     render() {
         const {user, roles, stButton} = this.state;
 
-        const props = {
-            action: `${AI_BACKEND}`,
-            //headers: {'Authorization': 'bearer ' + getToken()},
-            type: 'drag',
-            accept: '.mp4, .mp3',
-            beforeUpload(file) {
-                console.log('beforeUpload', file.name);
-            },
-            onStart(file) {
-                console.log('onStart', file.name);
-            },
-            onError(err) {
-                console.log('onError', err);
-            },
-
-        };
-
         let opt = roles.map((role,i) => {
             if(role === "bb_user") {
                 return (
                     <Message>
-                        <Upload
-                            {...this.props}
-                            {...props}
-                            className="aricha"
-                            onSuccess={this.uploadDone}
-                            onStart={this.uploadStart}
-                            onProgress={this.progress} >
-                            Drop file here or click me
-                        </Upload>
-                        <Form>
-                            <Form.Field>
-                                <label>OR</label>
-                                <Input
-                                    placeholder="Put http link here.."
-                                    value={this.state.inputFile}
-                                    onChange={(e) => this.handleInputFileChange(e.target.value)}
-                                />
-
-                            </Form.Field>
-                        </Form>
+                        <MediaSource
+                            inputFile={this.state.inputFile}
+                            onInputFileChange={this.handleInputFileChange}
+                            onUploadStart={this.uploadStart}
+                            onUploadProgress={this.progress}
+                            onUploadDone={this.uploadDone}
+                        />
 
                         <Progress label='' percent={this.state.percent} indicating progress='percent' />
                         <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'monospace', marginTop: 10}}>
@@ -257,66 +217,15 @@ class Transcription extends Component {
                         </pre>
 
                         {this.state.logText === "Your files are ready!" && (
-                            <div style={{marginTop: 20}}>
-                                <Button
-                                    color="gray"
-                                    icon="download"
-                                    content="Download output.txt"
-                                    onClick={() => this.handleDownload('output.txt')}
-                                    style={{marginRight: 10}}
-                                />
-                                <Button
-                                    color="gray"
-                                    icon="download"
-                                    content="Download output.srt"
-                                    onClick={() => this.handleDownload('output.srt')}
-                                    style={{marginRight: 10}}
-                                />
-                                <Button
-                                    color="teal"
-                                    icon="users"
-                                    content="Add speakers"
-                                    as={Link}
-                                    to="/speakers"
-                                    state={{execSrt: 'output.srt', audio: this.state.audioFile}}
-                                />
-                            </div>
+                            <TranscriptionResults onDownload={this.handleDownload} audioFile={this.state.audioFile} />
                         )}
 
-                        {/* Configuration section */}
-                        <Segment style={{marginTop: 30}}>
-                            <Header as='h3'>Choose Your Settings</Header>
-                            <Form>
-
-                                <Form.Group widths='equal'>
-                                    <Form.Field>
-                                        <label>Language</label>
-                                        <Dropdown
-                                            placeholder='Select language'
-                                            fluid
-                                            selection
-                                            options={this.state.languageOptions}
-                                            value={this.state.language}
-                                            onChange={this.handleLanguageChange}
-                                        />
-                                    </Form.Field>
-
-                                    <Form.Field>
-                                        <label>Output Formats</label>
-                                        <Dropdown
-                                            placeholder='Select formats'
-                                            fluid
-                                            selection
-                                            multiple
-                                            options={this.state.formatOptions}
-                                            value={this.state.outputFormats}
-                                            onChange={this.handleFormatChange}
-                                        />
-                                    </Form.Field>
-                                </Form.Group>
-
-                            </Form>
-                        </Segment>
+                        <TranscriptionSettings
+                            language={this.state.language}
+                            outputFormats={this.state.outputFormats}
+                            onLanguageChange={this.handleLanguageChange}
+                            onFormatChange={this.handleFormatChange}
+                        />
 
                         <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={() => this.saveConfiguration(true)} >
                             Start Transcription
