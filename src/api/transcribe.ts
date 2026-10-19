@@ -29,7 +29,7 @@ interface JobStatus {
 
 const POLL_INTERVAL_MS = 2000;
 
-async function errorFrom(res: Response): Promise<Error> {
+export async function errorFrom(res: Response): Promise<Error> {
   const text = await res.text().catch(() => '');
   let detail = text;
   try {
