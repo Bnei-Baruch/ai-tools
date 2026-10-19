@@ -8,7 +8,6 @@ const FORMAT_OPTIONS = [
 
 const LANGUAGE_OPTIONS = [
     { key: 'he', value: 'he', text: 'Hebrew (V3)' },
-    { key: 'he_bb', value: 'he_bb', text: 'Hebrew (BB)' },
     { key: 'en', value: 'en', text: 'English' },
     { key: 'ru', value: 'ru', text: 'Russian' },
     { key: 'auto', value: 'auto', text: 'Autodetect' }
