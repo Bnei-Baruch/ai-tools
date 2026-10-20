@@ -1,4 +1,4 @@
-import { STT_URL } from '../consts';
+import { aiTrnsFetch } from './aiTrns';
 
 export interface Chunk {
   start: number;
@@ -13,18 +13,11 @@ export interface SttResult {
   jobId: string;
 }
 
-interface JobResult {
-  url: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'skipped';
-  warnings?: string[];
-  srt_url?: string;
-  srt?: string;
-  error?: string;
-}
-
-interface JobStatus {
-  status: 'queued' | 'running' | 'done' | 'failed';
-  results: JobResult[];
+// GET /jobs/{id} of ai-trns (the fields used here)
+interface Job {
+  id: string;
+  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
+  error?: string | null;
 }
 
 const POLL_INTERVAL_MS = 2000;
@@ -45,48 +38,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchText(url: string | URL): Promise<string> {
-  const res = await fetch(url);
+async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw await errorFrom(res);
-  return res.text();
+  return res.json() as Promise<T>;
 }
 
-// Async job API: POST returns 202 + Location: /jobs/<id>, poll GET until the
-// requested file's SRT is available (srt inline, or fetched via srt_url).
+// An ai-trns job for a media URL (Hebrew): POST /jobs -> poll GET /jobs/{id} -> the SRT.
 export async function transcribe(url: string): Promise<SttResult> {
-  const endpoint = new URL(STT_URL, window.location.href);
+  const form = new FormData();
+  form.set('url', url);
+  form.set('lang', 'he');
+  form.set('format', 'srt');
+  let job = await json<Job>(await aiTrnsFetch('/jobs', { method: 'POST', body: form }));
 
-  const postRes = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ urls: [url] }),
-  });
-  if (postRes.status !== 202) throw await errorFrom(postRes);
-
-  const location = postRes.headers.get('Location');
-  if (!location) throw new Error('תגובת השרת חסרה כותרת Location לעבודה');
-  const jobUrl = new URL(location, endpoint);
-  const jobId = jobUrl.pathname.split('/').filter(Boolean).pop() ?? '';
-
-  for (;;) {
-    const jobRes = await fetch(jobUrl);
-    if (!jobRes.ok) throw await errorFrom(jobRes);
-    const job = (await jobRes.json()) as JobStatus;
-    const file = job.results.find((f) => f.url === url) ?? job.results[0];
-
-    if (file?.status === 'failed' || file?.status === 'skipped') {
-      throw new Error(file.error ?? file.warnings?.join('; ') ?? 'התמלול נכשל');
-    }
-    if (job.status === 'failed') throw new Error('העבודה נכשלה');
-
-    const srt = file?.srt ?? (file?.srt_url ? await fetchText(new URL(file.srt_url, jobUrl)) : null);
-    if (srt) {
-      const chunks = parseSrt(srt);
-      return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId };
-    }
-
+  while (job.status === 'queued' || job.status === 'running') {
     await sleep(POLL_INTERVAL_MS);
+    job = await json<Job>(await aiTrnsFetch(`/jobs/${job.id}`));
   }
+  if (job.status !== 'done') throw new Error(job.error || 'התמלול נכשל');
+
+  const res = await aiTrnsFetch(`/jobs/${job.id}/result?format=srt`);
+  if (!res.ok) throw await errorFrom(res);
+  const srt = await res.text();
+  const chunks = parseSrt(srt);
+  return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId: job.id };
 }
 
 // Parses "HH:MM:SS,mmm" SRT timestamps into seconds.

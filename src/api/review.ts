@@ -1,7 +1,8 @@
-import { REVIEW_API, STT_API } from '../consts';
-import { errorFrom, type Chunk } from './transcribe';
+import { REVIEW_API } from '../consts';
+import { aiTrnsFetch } from './aiTrns';
+import { errorFrom, transcribe, type Chunk } from './transcribe';
 
-// Formats: TASK-stt-review.md, "1. Данные". Server side: ../stt-api, /review/*.
+// Formats: TASK-stt-review.md, "1. Данные". Server side: ai-trns, /review/* (ai_trns/api/review.py).
 
 export interface ReviewSegment {
   id: string;
@@ -17,23 +18,23 @@ export interface ReviewSegment {
   // empty until the model has run (status "pending")
   chunks: Chunk[];
   baseline_chunks?: Chunk[];
-  // segments are added by reviewers from a kabbalahmedia link and transcribed on the server;
+  // segments are added by reviewers from a kabbalahmedia link and transcribed by an ai-trns job;
   // no status = prepared in advance, ready
   status?: SegmentStatus;
   error?: string;
+  job_id?: string;
   unit_uid?: string;
   added_by?: string;
   added_by_name?: string;
   // the model that made this lesson's transcript -- the one its results are about
   model?: string;
-  transcribed_by?: string;
   transcribed_at?: string;
 }
 
 export type SegmentStatus = 'pending' | 'ready' | 'failed';
 
-// POST /review/sets/{set_id}/segments: the server builds the CDN URLs from the file ids and adds the
-// lesson to the set as "pending"; the browser then transcribes it (see uploadTranscript).
+// POST /review/sets/{set_id}/segments: the server builds the CDN URLs from the file ids, adds the
+// lesson to the set as "pending" and queues a job for it; the lesson is "ready" when the job is done.
 export interface NewSegment {
   unit_uid: string;
   title: string;
@@ -86,24 +87,17 @@ export interface AllResults {
 }
 
 // REACT_APP_REVIEW_API=local: the set is public/review/{set_id}.json, results stay in this browser.
-// For trying the screens out without stt-api; never for the real review.
+// For trying the screens out without the review API (added lessons are still transcribed by ai-trns);
+// never for the real review.
 export const REVIEW_LOCAL = REVIEW_API === 'local';
-const API = REVIEW_API || STT_API;
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
 
-// Requests as the תמלול page makes them (api/transcribe.ts): plain fetch, the URL resolved against the page,
-// no Authorization header (the server takes the reviewer from the path), JSON only when there is a body.
+// The user's token goes with every request: the server checks that the reviewer is the user.
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const url = new URL(`${API}${path}`, window.location.href);
   const headers = init.body ? { 'Content-Type': 'application/json' } : undefined;
-  let res: Response;
-  try {
-    res = await fetch(url, { ...init, headers });
-  } catch {
-    throw new Error('השרת אינו זמין');
-  }
+  const res = await aiTrnsFetch(path, { ...init, headers });
   if (res.status === 404) throw new NotFoundError(path);
   if (!res.ok) {
     const error = await errorFrom(res);
@@ -151,7 +145,7 @@ function saveLocalAdded(setId: string, segment: ReviewSegment) {
 }
 
 async function localAddSegment(setId: string, req: NewSegment): Promise<ReviewSegment> {
-  const segment: ReviewSegment = {
+  const pending: ReviewSegment = {
     id: req.unit_uid,
     title: req.title,
     media_url: `https://cdn.kabbalahmedia.info/${req.audio_file_id}`,
@@ -164,20 +158,17 @@ async function localAddSegment(setId: string, req: NewSegment): Promise<ReviewSe
     added_by: req.reviewer,
     added_by_name: req.reviewer_name,
   };
+  let segment: ReviewSegment;
+  try {
+    const { chunks } = await transcribe(pending.media_url);
+    segment = { ...pending, chunks, end: Math.max(pending.end, chunks.at(-1)?.end ?? 0), status: 'ready' };
+  } catch (e) {
+    segment = { ...pending, status: 'failed', error: e instanceof Error ? e.message : String(e) };
+  }
   saveLocalAdded(setId, segment);
   // re-adding a deleted lesson brings it back
   localStorage.setItem(deletedKey(setId), JSON.stringify(localDeleted(setId).filter((id) => id !== segment.id)));
   return segment;
-}
-
-function localUploadTranscript(setId: string, segmentId: string, body: TranscriptUpload): ReviewSegment {
-  const segment = localAdded(setId).find((s) => s.id === segmentId);
-  if (!segment) throw new NotFoundError(segmentId);
-  const updated: ReviewSegment = body.chunks
-    ? { ...segment, chunks: body.chunks, end: Math.max(segment.end, body.chunks.at(-1)?.end ?? 0), status: 'ready', error: undefined }
-    : { ...segment, status: 'failed', error: body.error };
-  saveLocalAdded(setId, updated);
-  return updated;
 }
 
 const LOCAL_PREFIX = 'review-local:';
@@ -224,25 +215,7 @@ export async function putResult(result: ReviewResult, { keepalive = false } = {}
   });
 }
 
-// The model's transcript of the whole lesson (made in the browser: the server can't reach the STT service),
-// or the error if transcription failed. model: the set's model, the one STT_URL is expected to serve.
-export interface TranscriptUpload {
-  reviewer: string;
-  model: string;
-  chunks?: Chunk[];
-  error?: string;
-}
-
-// -> the segment, "ready" (or "failed"). 409: it is already ready -- someone else transcribed it first.
-export async function uploadTranscript(setId: string, segmentId: string, body: TranscriptUpload): Promise<ReviewSegment> {
-  if (REVIEW_LOCAL) return localUploadTranscript(setId, segmentId, body);
-  return call(`/review/sets/${encodeURIComponent(setId)}/segments/${encodeURIComponent(segmentId)}/transcript`, {
-    method: 'PUT',
-    body: JSON.stringify(body),
-  });
-}
-
-// -> the new segment, status "pending": the client then transcribes it and calls uploadTranscript().
+// -> the new segment, status "pending" (local mode: transcribed already, "ready" or "failed").
 export async function addSegment(setId: string, req: NewSegment): Promise<ReviewSegment> {
   if (REVIEW_LOCAL) return localAddSegment(setId, req);
   return call(`/review/sets/${encodeURIComponent(setId)}/segments`, { method: 'POST', body: JSON.stringify(req) });

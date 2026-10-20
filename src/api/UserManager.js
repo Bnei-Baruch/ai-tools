@@ -84,4 +84,12 @@ export const getUser = (callback) => {
         .catch((err) => callback(null));
 };
 
+// A fresh access token for API calls, or null when nobody is logged in.
+export const getToken = async () => {
+    initPromise ??= kc.init(initOptions);
+    if (!(await initPromise.catch(() => false))) return null;
+    await kc.updateToken(30);
+    return kc.token;
+};
+
 export default kc;

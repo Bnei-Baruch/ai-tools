@@ -3,12 +3,13 @@ export const WEB_URL = import.meta.env.REACT_APP_WEB_URL;
 export const AI_BACKEND = import.meta.env.REACT_APP_AI_BACKEND;
 export const EXEC_API = import.meta.env.REACT_APP_EXEC_API;
 export const STT_API = import.meta.env.REACT_APP_STT_API;
-export const STT_URL = import.meta.env.REACT_APP_STT_URL;
+// ai-trns REST API: transcription jobs (/jobs) and STT review (/review/*)
+export const AI_TRNS_API = import.meta.env.REACT_APP_AI_TRNS_API;
 export const STT_MODEL = import.meta.env.REACT_APP_STT_MODEL;
 export const ALIGN_URL = import.meta.env.REACT_APP_ALIGN_URL;
-// STT review: the API (defaults to STT_API; "local" -- see api/review.ts).
+// STT review: "local" -- see api/review.ts; otherwise ai-trns.
 export const REVIEW_API = import.meta.env.REACT_APP_REVIEW_API;
-// All reviewers share one set (the stt-api routes still take a set id).
+// All reviewers share one set (the API routes still take a set id).
 export const REVIEW_SET = 'main';
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.
 export const KEYCLOAK_URL = import.meta.env.REACT_APP_KEYCLOAK_URL || 'https://accounts.kab.info/auth';

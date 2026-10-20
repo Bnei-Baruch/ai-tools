@@ -28,14 +28,13 @@ interface Props {
   onOpen: (segmentId: string) => void;
   onAdd: () => void;
   onDelete: (segment: ReviewSegment) => void;
-  // lessons being transcribed in this tab; pending ones not in it can be transcribed here
-  transcribing: ReadonlySet<string>;
-  onTranscribe: (segment: ReviewSegment) => void;
+  // a lesson whose transcription failed: transcribe it again
+  onRetry: (segment: ReviewSegment) => void;
   onHelp: () => void;
 }
 
 // Reviewers pick their segments themselves from the whole set.
-export default function ReviewList({ set, results, othersDone, userName, onOpen, onAdd, onDelete, transcribing, onTranscribe, onHelp }: Props) {
+export default function ReviewList({ set, results, othersDone, userName, onOpen, onAdd, onDelete, onRetry, onHelp }: Props) {
   const seconds = (s: ReviewSegment) => s.end - s.start;
   const done = set.segments.filter((s) => segmentStatus(results[s.id]) === 'done');
   const doneSeconds = done.reduce((sum, s) => sum + seconds(s), 0);
@@ -76,7 +75,7 @@ export default function ReviewList({ set, results, othersDone, userName, onOpen,
               <button type="button" className="review-segments__item" disabled={!isReady(s)} onClick={() => onOpen(s.id)}>
                 <span className="review-segments__title" dir="auto">
                   {s.title}
-                  {s.status === 'failed' && !transcribing.has(s.id) && (
+                  {s.status === 'failed' && (
                     <span className="review-segments__error" dir="auto">התמלול נכשל: {s.error}</span>
                   )}
                 </span>
@@ -86,19 +85,13 @@ export default function ReviewList({ set, results, othersDone, userName, onOpen,
                   </span>
                 )}
                 <span className="review-segments__duration">{formatClock(seconds(s))}</span>
-                {transcribing.has(s.id) && <span className="badge badge--run" title="אל תסגרו את הדף עד הסוף">מתמלל…</span>}
-                {s.status === 'pending' && !transcribing.has(s.id) && <span className="badge badge--muted">ממתין לתמלול</span>}
-                {s.status === 'failed' && !transcribing.has(s.id) && <span className="badge badge--error">שגיאה</span>}
+                {s.status === 'pending' && <span className="badge badge--run" title="אפשר לסגור את הדף, התמלול ממשיך בשרת">מתמלל…</span>}
+                {s.status === 'failed' && <span className="badge badge--error">שגיאה</span>}
                 {isReady(s) && <span className={status.className}>{status.label}</span>}
               </button>
-              {!isReady(s) && !transcribing.has(s.id) && (
-                <button
-                  type="button"
-                  className="btn btn--ghost review-segments__transcribe"
-                  title={s.status === 'pending' ? 'אם אף אחד אחר לא מתמלל אותו עכשיו' : undefined}
-                  onClick={() => onTranscribe(s)}
-                >
-                  {s.status === 'failed' ? 'ניסיון נוסף' : 'תמלול'}
+              {s.status === 'failed' && (
+                <button type="button" className="btn btn--ghost review-segments__transcribe" onClick={() => onRetry(s)}>
+                  ניסיון נוסף
                 </button>
               )}
               <button type="button" className="icon-btn review-segments__delete" title="מחיקה מהרשימה" onClick={() => onDelete(s)}>
