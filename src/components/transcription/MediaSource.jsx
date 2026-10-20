@@ -1,7 +1,7 @@
 import React from 'react';
-import { Form, Input } from 'semantic-ui-react';
 import Upload from 'rc-upload';
 import { AI_BACKEND } from '../../consts';
+import { Field, Input } from '../ui';
 
 const uploadProps = {
     action: `${AI_BACKEND}`,
@@ -21,22 +21,20 @@ const MediaSource = ({ inputFile, onInputFileChange, onUploadStart, onUploadProg
     <>
         <Upload
             {...uploadProps}
-            className="aricha"
+            className="block h-[50px] w-full cursor-pointer border-2 border-dashed border-[#0087F7] bg-[#bfecbf] text-center text-sm leading-[46px] font-bold"
             onSuccess={onUploadDone}
             onStart={onUploadStart}
             onProgress={onUploadProgress} >
             Drop file here or click me
         </Upload>
-        <Form>
-            <Form.Field>
-                <label>OR</label>
-                <Input
-                    placeholder="Put http link here.."
-                    value={inputFile}
-                    onChange={(e) => onInputFileChange(e.target.value)}
-                />
-            </Form.Field>
-        </Form>
+        <Field label="OR" htmlFor="media-link" className="mt-4 text-left">
+            <Input
+                id="media-link"
+                placeholder="Put http link here.."
+                value={inputFile}
+                onChange={(e) => onInputFileChange(e.target.value)}
+            />
+        </Field>
     </>
 );
 

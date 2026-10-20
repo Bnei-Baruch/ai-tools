@@ -5,7 +5,7 @@ interface Props {
   // WebVTT object URL; adds the subtitles track and its on/off toggle
   trackUrl: string | null;
   trackLabel: string;
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   onTimeUpdate: (time: number) => void;
   // false: no native controls, the caller renders its own (as children, under the video)
   controls?: boolean;

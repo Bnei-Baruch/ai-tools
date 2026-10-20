@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Button, Container, Form, Header, Message, Segment } from 'semantic-ui-react';
 import { diarizeSrt } from '../api/stt';
 import { fetchExecFile } from '../api/exec';
 import { saveBlob } from '../utils';
@@ -11,6 +10,7 @@ import ErrorMessage from '../components/form/ErrorMessage';
 import Stats from '../components/form/Stats';
 import VoiceSamples, { baseName } from '../components/speakers/VoiceSamples';
 import SpeakerHints from '../components/speakers/SpeakerHints';
+import { Button, Card, Message, Page, PageHeader } from '../components/ui';
 
 const Speakers = () => {
     // Transcription hands over {execSrt: 'output.srt', audio: File | null}
@@ -30,7 +30,8 @@ const Speakers = () => {
             .catch((err) => setHandoverError(`Can't load ${handover.execSrt}: ${err.message}`));
     }, [handover]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         setResult(null);
         const res = await call.run((onUploadProgress) => diarizeSrt(audio, srt, {
             samples: samples.map((s) => s.file),
@@ -44,36 +45,36 @@ const Speakers = () => {
     const { loading } = call;
 
     return (
-        <Container style={{ marginTop: 20 }}>
-            <Segment>
-                <Header as='h2' content='Speakers' subheader='Audio + SRT: every cue gets a speaker label' />
-                <Form onSubmit={handleSubmit}>
-                    {handoverError && <Message warning visible content={handoverError} />}
+        <Page>
+            <Card>
+                <PageHeader title='Speakers' subheader='Audio + SRT: every cue gets a speaker label' />
+                <form onSubmit={handleSubmit}>
+                    {handoverError && <Message tone='warning' className='mb-4'>{handoverError}</Message>}
                     {handover?.execSrt && !audio && (
-                        <Message info visible content='Choose the audio file that was transcribed' />
+                        <Message tone='info' className='mb-4'>Choose the audio file that was transcribed</Message>
                     )}
-                    <Form.Group widths='equal'>
+                    <div className='grid gap-4 sm:grid-cols-2'>
                         <FileField label='Audio' accept='audio/*,video/*' file={audio} onChange={setAudio} disabled={loading} />
                         <FileField label='Subtitles (SRT)' accept='.srt' file={srt} onChange={setSrt} disabled={loading} />
-                    </Form.Group>
+                    </div>
                     <VoiceSamples samples={samples} onChange={setSamples} disabled={loading} />
                     <SpeakerHints hints={hints} onChange={setHints} disabled={loading} />
                     <SubmitButton call={call} disabled={!audio || !srt}>Add speakers</SubmitButton>
-                </Form>
+                </form>
 
                 <ErrorMessage call={call} />
 
                 {result && (
-                    <Message positive visible>
-                        <Message.Header>{result.fileName}</Message.Header>
+                    <Message tone='success' header={result.fileName} className='mt-4'>
                         <Stats stats={result.stats}
                                labels={[['speakers', 'Speakers'], ['named', 'Named'], ['split_cues', 'Split cues']]} />
-                        <Button primary icon='download' content='Download'
-                                onClick={() => saveBlob(result.blob, result.fileName)} />
+                        <Button variant='primary' className='mt-4' onClick={() => saveBlob(result.blob, result.fileName)}>
+                            ⬇ Download
+                        </Button>
                     </Message>
                 )}
-            </Segment>
-        </Container>
+            </Card>
+        </Page>
     );
 };
 

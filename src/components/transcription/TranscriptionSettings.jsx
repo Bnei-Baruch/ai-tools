@@ -1,50 +1,44 @@
 import React from 'react';
-import { Dropdown, Form, Header, Segment } from 'semantic-ui-react';
+import { Card, Check, Field, Select } from '../ui';
 
 const FORMAT_OPTIONS = [
-    { key: 'txt', value: 'txt', text: '--txt (text file)' },
-    { key: 'srt', value: 'srt', text: '--srt (subtitles)' }
+    { value: 'txt', text: '--txt (text file)' },
+    { value: 'srt', text: '--srt (subtitles)' }
 ];
 
 const LANGUAGE_OPTIONS = [
-    { key: 'he', value: 'he', text: 'Hebrew (V3)' },
-    { key: 'en', value: 'en', text: 'English' },
-    { key: 'ru', value: 'ru', text: 'Russian' },
-    { key: 'auto', value: 'auto', text: 'Autodetect' }
+    { value: 'he', text: 'Hebrew (V3)' },
+    { value: 'en', text: 'English' },
+    { value: 'ru', text: 'Russian' },
+    { value: 'auto', text: 'Autodetect' }
 ];
 
-const TranscriptionSettings = ({ language, outputFormats, onLanguageChange, onFormatChange }) => (
-    <Segment style={{marginTop: 30}}>
-        <Header as='h3'>Choose Your Settings</Header>
-        <Form>
-            <Form.Group widths='equal'>
-                <Form.Field>
-                    <label>Language</label>
-                    <Dropdown
-                        placeholder='Select language'
-                        fluid
-                        selection
-                        options={LANGUAGE_OPTIONS}
-                        value={language}
-                        onChange={onLanguageChange}
-                    />
-                </Form.Field>
+// onLanguageChange(language), onFormatChange(formats[])
+const TranscriptionSettings = ({ language, outputFormats, onLanguageChange, onFormatChange }) => {
+    const toggleFormat = (value, on) =>
+        onFormatChange(FORMAT_OPTIONS.map((o) => o.value).filter((v) => (v === value ? on : outputFormats.includes(v))));
 
-                <Form.Field>
-                    <label>Output Formats</label>
-                    <Dropdown
-                        placeholder='Select formats'
-                        fluid
-                        selection
-                        multiple
-                        options={FORMAT_OPTIONS}
-                        value={outputFormats}
-                        onChange={onFormatChange}
-                    />
-                </Form.Field>
-            </Form.Group>
-        </Form>
-    </Segment>
-);
+    return (
+        <Card className="mt-8 text-left text-base">
+            <h3 className="mb-4 text-lg font-semibold">Choose Your Settings</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Language" htmlFor="transcription-language">
+                    <Select id="transcription-language" value={language} onChange={(e) => onLanguageChange(e.target.value)}>
+                        {LANGUAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.text}</option>)}
+                    </Select>
+                </Field>
+
+                <Field label="Output Formats">
+                    <div className="flex flex-wrap gap-4 py-2">
+                        {FORMAT_OPTIONS.map((o) => (
+                            <Check key={o.value} label={o.text} checked={outputFormats.includes(o.value)}
+                                   onChange={(e) => toggleFormat(o.value, e.target.checked)} />
+                        ))}
+                    </div>
+                </Field>
+            </div>
+        </Card>
+    );
+};
 
 export default TranscriptionSettings;

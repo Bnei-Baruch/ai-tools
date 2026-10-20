@@ -1,4 +1,4 @@
-/* Styles from stt-api-client, scoped so they don't clash with semantic-ui. */
+/* Styles from stt-api-client, scoped to the stt tools (they override Tailwind's preflight). */
 .stt-tool {
   --bg: #f4f5f7;
   --surface: #fff;
@@ -33,6 +33,7 @@
   }
   .card__header { margin-bottom: 20px; }
   h1 { margin: 0 0 4px; font-family: inherit; font-size: 1.5rem; }
+  h1, h2, h3, h4 { font-weight: 700; }
   .muted { color: var(--muted); margin: 0; font-size: .925rem; }
   .center { text-align: center; margin-top: 10px; }
 

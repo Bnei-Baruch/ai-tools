@@ -1,5 +1,4 @@
 import React, { Component, Fragment } from 'react';
-import { Progress,Message,Button } from 'semantic-ui-react';
 import LoginPage from '../components/LoginPage';
 import MediaSource from '../components/transcription/MediaSource';
 import TranscriptionResults from '../components/transcription/TranscriptionResults';
@@ -8,6 +7,7 @@ import {kc} from "../api/UserManager";
 import mqtt from "../api/mqtt";
 import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile} from "../api/exec";
 import {saveBlob} from "../utils";
+import { Button, Card } from '../components/ui';
 
 class Transcription extends Component {
 
@@ -179,12 +179,12 @@ class Transcription extends Component {
         this.setState({ inputFile: value, audioFile: null });
     }
 
-    handleFormatChange = (e, { value }) => {
-        this.setState({ outputFormats: value });
+    handleFormatChange = (outputFormats) => {
+        this.setState({ outputFormats });
     }
 
-    handleLanguageChange = (e, { value }) => {
-        this.setState({ language: value });
+    handleLanguageChange = (language) => {
+        this.setState({ language });
     }
 
     handleDownload = async (fileName) => {
@@ -202,7 +202,7 @@ class Transcription extends Component {
         let opt = roles.map((role,i) => {
             if(role === "bb_user") {
                 return (
-                    <Message>
+                    <Card key={i} className="text-base">
                         <MediaSource
                             inputFile={this.state.inputFile}
                             onInputFileChange={this.handleInputFileChange}
@@ -211,8 +211,13 @@ class Transcription extends Component {
                             onUploadDone={this.uploadDone}
                         />
 
-                        <Progress label='' percent={this.state.percent} indicating progress='percent' />
-                        <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'monospace', marginTop: 10}}>
+                        <div className="mt-5 h-6 overflow-hidden rounded bg-slate-200">
+                            <div className="h-full bg-blue-600 text-xs leading-6 font-semibold text-white transition-all"
+                                 style={{width: `${this.state.percent}%`}}>
+                                {this.state.percent > 0 && `${this.state.percent}%`}
+                            </div>
+                        </div>
+                        <pre className="mt-2.5 font-mono whitespace-pre-wrap">
                              {this.state.logText}
                         </pre>
 
@@ -227,11 +232,11 @@ class Transcription extends Component {
                             onFormatChange={this.handleFormatChange}
                         />
 
-                        <Button key={i + 100} disabled={stButton} size='massive' color='blue' onClick={() => this.saveConfiguration(true)} >
+                        <Button variant='primary' size='xl' className='mt-6' disabled={stButton} onClick={() => this.saveConfiguration(true)} >
                             Start Transcription
                         </Button>
 
-                    </Message>);
+                    </Card>);
             }
             return null
         });

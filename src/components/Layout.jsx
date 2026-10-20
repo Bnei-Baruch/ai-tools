@@ -1,7 +1,9 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Menu } from 'semantic-ui-react';
 import SttApiStatus from './SttApiStatus';
+import { cx } from './ui';
+
+const ITEM = 'border-b-2 px-4 py-3 text-sm whitespace-nowrap';
 
 // tools: [{path, title, element, disabled, sttApi, keepAlive}] -- one menu item each.
 // keepAlive tools are rendered here rather than by their route, so they survive navigation.
@@ -18,17 +20,27 @@ const Layout = ({ tools }) => {
 
   return (
     <>
-      <Menu attached='top'>
+      <nav className='flex overflow-x-auto border-b border-slate-200 bg-white'>
         {tools.map(({ path, title, disabled }) => (disabled
-          ? <Menu.Item key={path} disabled content={title} title='Temporarily unavailable' />
-          : <Menu.Item key={path} as={NavLink} to={`/${path}`} content={title} />
+          ? <span key={path} className={cx(ITEM, 'cursor-not-allowed border-transparent text-slate-400')} title='Temporarily unavailable'>{title}</span>
+          : (
+            <NavLink
+              key={path}
+              to={`/${path}`}
+              className={({ isActive }) => cx(ITEM, isActive
+                ? 'border-blue-600 font-semibold text-slate-900'
+                : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900')}
+            >
+              {title}
+            </NavLink>
+          )
         ))}
         {tools.some((t) => t.sttApi && !t.disabled) && (
-          <Menu.Menu position='right'>
+          <div className='ml-auto'>
             <SttApiStatus />
-          </Menu.Menu>
+          </div>
         )}
-      </Menu>
+      </nav>
       <Suspense fallback={null}>
         {kept.map((t) => <div key={t.path} hidden={t !== active}>{t.element}</div>)}
         <Outlet />

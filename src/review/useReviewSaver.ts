@@ -39,7 +39,7 @@ function clearDraft(r: ReviewResult) {
 export default function useReviewSaver() {
   const [state, setState] = useState<SaveState>('idle');
   const pending = useRef<ReviewResult | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const chain = useRef(Promise.resolve());
 
   const flush = useCallback(({ keepalive = false } = {}) => {
