@@ -70,9 +70,16 @@ const setData = () => {
 // keycloak-js allows init() only once per instance; later calls reuse its result.
 let initPromise = null;
 
-export const getUser = (callback) => {
+// Called once on app start: check-sso (without a silent-check iframe) redirects the whole page to
+// Keycloak and back, which must happen on load -- started from a click, it would wipe the page --
+// and the code Keycloak returns in the URL is read only by init().
+export const initAuth = () => {
     initPromise ??= kc.init(initOptions);
-    initPromise
+    return initPromise;
+};
+
+export const getUser = (callback) => {
+    initAuth()
         .then((authenticated) => {
             if (authenticated) {
                 const user = setData();
@@ -86,8 +93,7 @@ export const getUser = (callback) => {
 
 // A fresh access token for API calls, or null when nobody is logged in.
 export const getToken = async () => {
-    initPromise ??= kc.init(initOptions);
-    if (!(await initPromise.catch(() => false))) return null;
+    if (!(await initAuth().catch(() => false))) return null;
     await kc.updateToken(30);
     return kc.token;
 };
