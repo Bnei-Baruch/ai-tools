@@ -37,7 +37,7 @@ const CATEGORY_KEYS: Record<string, ErrorCategory> = Object.fromEntries(
   CATEGORIES.flatMap((c) => [[`Digit${c.key}`, c.id], [`Numpad${c.key}`, c.id]]),
 );
 
-const SAVE_LABELS: Record<SaveState, string> = {
+export const SAVE_LABELS: Record<SaveState, string> = {
   idle: '',
   saving: 'שומר…',
   saved: 'נשמר ✓',

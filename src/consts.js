@@ -6,6 +6,8 @@ export const STT_API = import.meta.env.REACT_APP_STT_API;
 // ai-trns REST API: transcription jobs (/jobs) and STT review (/review/*)
 export const AI_TRNS_API = import.meta.env.REACT_APP_AI_TRNS_API;
 export const STT_MODEL = import.meta.env.REACT_APP_STT_MODEL;
+// stt-api's transcription job (the older service), offered on the compare page next to ai-trns
+export const STT_URL = import.meta.env.REACT_APP_STT_URL || 'https://ai-tools.kab.info/stt-api/stt/transcribe';
 export const ALIGN_URL = import.meta.env.REACT_APP_ALIGN_URL;
 // STT review: "local" -- see api/review.ts; otherwise ai-trns.
 export const REVIEW_API = import.meta.env.REACT_APP_REVIEW_API;

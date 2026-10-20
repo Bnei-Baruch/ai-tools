@@ -8,6 +8,7 @@ const TextDiff = lazy(() => import('./pages/TextDiff'));
 const Stt = lazy(() => import('./pages/Stt'));
 const Align = lazy(() => import('./pages/Align'));
 const Review = lazy(() => import('./pages/Review'));
+const Compare = lazy(() => import('./pages/Compare'));
 
 // To add a tool, add an entry here: it gets a route and a menu item.
 // A tool owns everything under its path (e.g. /review/...).
@@ -22,6 +23,7 @@ export const TOOLS = [
   { path: 'stt', title: 'תמלול', element: <SttTool><Stt /></SttTool> },
   { path: 'align', title: 'תזמון מילים', element: <SttTool><Align /></SttTool>, disabled: true },
   { path: 'review', title: 'בדיקת תמלול', element: <SttTool><Review /></SttTool> },
+  { path: 'compare', title: 'השוואת תמלול', element: <SttTool><Compare /></SttTool> },
 ];
 
 export const isToolEnabled = (path) => TOOLS.some((t) => t.path === path && !t.disabled);

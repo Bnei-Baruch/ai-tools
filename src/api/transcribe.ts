@@ -1,3 +1,4 @@
+import { STT_URL } from '../consts';
 import { aiTrnsFetch } from './aiTrns';
 
 export interface Chunk {
@@ -62,6 +63,57 @@ export async function transcribe(url: string): Promise<SttResult> {
   const srt = await res.text();
   const chunks = parseSrt(srt);
   return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId: job.id };
+}
+
+// stt-api's job (STT_URL): POST {urls} -> 202 + Location: /jobs/<id>, poll it until the file's SRT is there
+// (inline, or at srt_url). No token.
+interface SttApiFile {
+  url: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'skipped';
+  warnings?: string[];
+  srt_url?: string;
+  srt?: string;
+  error?: string;
+}
+
+interface SttApiJob {
+  status: 'queued' | 'running' | 'done' | 'failed';
+  results: SttApiFile[];
+}
+
+export async function transcribeSttApi(url: string): Promise<SttResult> {
+  const endpoint = new URL(STT_URL, window.location.href);
+  const post = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ urls: [url] }),
+  });
+  if (post.status !== 202) throw await errorFrom(post);
+  const location = post.headers.get('Location');
+  if (!location) throw new Error('תגובת השרת חסרה כותרת Location לעבודה');
+  const jobUrl = new URL(location, endpoint);
+  const jobId = jobUrl.pathname.split('/').filter(Boolean).pop() ?? '';
+
+  for (;;) {
+    const job = await json<SttApiJob>(await fetch(jobUrl));
+    const file = job.results.find((f) => f.url === url) ?? job.results[0];
+    if (file?.status === 'failed' || file?.status === 'skipped') {
+      throw new Error(file.error ?? file.warnings?.join('; ') ?? 'התמלול נכשל');
+    }
+    if (job.status === 'failed') throw new Error('העבודה נכשלה');
+
+    let srt = file?.srt;
+    if (!srt && file?.srt_url) {
+      const res = await fetch(new URL(file.srt_url, jobUrl));
+      if (!res.ok) throw await errorFrom(res);
+      srt = await res.text();
+    }
+    if (srt) {
+      const chunks = parseSrt(srt);
+      return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId };
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
 }
 
 // Parses "HH:MM:SS,mmm" SRT timestamps into seconds.
