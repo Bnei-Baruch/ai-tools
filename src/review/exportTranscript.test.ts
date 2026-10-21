@@ -20,16 +20,16 @@ test('srtTime', () => {
 });
 
 test('toTxt and toSrt', () => {
-  assert.equal(toTxt(chunks), 'שלום עולם\nשורה <שנייה> & עוד\n');
+  assert.equal(toTxt(chunks), 'שלום עולם שורה <שנייה> & עוד');
   assert.equal(toSrt(chunks),
     '1\n00:00:00,000 --> 00:00:02,500\nשלום עולם\n\n2\n01:01:01,007 --> 01:01:03,000\nשורה <שנייה> & עוד\n');
 });
 
-test('toDocx writes an escaped paragraph per line', async () => {
+test('toDocx writes the whole text, escaped, in one paragraph', async () => {
   const zip = await JSZip.loadAsync(await (await toDocx(chunks)).arrayBuffer());
   const xml = await zip.file('word/document.xml')!.async('string');
-  assert.equal(xml.match(/<w:p>/g)?.length, 2);
-  assert.ok(xml.includes('שורה &lt;שנייה&gt; &amp; עוד'));
+  assert.equal(xml.match(/<w:p>/g)?.length, 1);
+  assert.ok(xml.includes('שלום עולם שורה &lt;שנייה&gt; &amp; עוד'));
 });
 
 test('exportFileName drops characters file systems refuse', () => {

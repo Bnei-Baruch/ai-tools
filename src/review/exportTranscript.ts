@@ -10,7 +10,10 @@ export type ExportFormat = 'txt' | 'srt' | 'docx';
 export const reviewedChunks = (chunks: Chunk[], edits: Record<number, ChunkReview>): Chunk[] =>
   chunks.map((c, i) => (edits[i] ? { ...c, text: edits[i].corrected } : c));
 
-export const toTxt = (chunks: Chunk[]) => chunks.map((c) => c.text).join('\n') + '\n';
+// txt and docx: one continuous text, no line breaks
+export const plainText = (chunks: Chunk[]) => chunks.map((c) => c.text.trim()).filter(Boolean).join(' ');
+
+export const toTxt = plainText;
 
 // seconds -> "HH:MM:SS,mmm"
 export function srtTime(seconds: number): string {
@@ -24,11 +27,9 @@ export const toSrt = (chunks: Chunk[]) =>
 
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// A minimal .docx: a right-to-left paragraph per line.
+// A minimal .docx: the whole text in one right-to-left paragraph.
 export function toDocx(chunks: Chunk[]): Promise<Blob> {
-  const paragraphs = chunks.map((c) =>
-    `<w:p><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space="preserve">${escapeXml(c.text)}</w:t></w:r></w:p>`,
-  ).join('');
+  const paragraph = `<w:p><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space="preserve">${escapeXml(plainText(chunks))}</w:t></w:r></w:p>`;
   const zip = new JSZip();
   zip.file('[Content_Types].xml',
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -45,7 +46,7 @@ export function toDocx(chunks: Chunk[]): Promise<Blob> {
   zip.file('word/document.xml',
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-    + `<w:body>${paragraphs}<w:sectPr><w:bidi/></w:sectPr></w:body></w:document>`);
+    + `<w:body>${paragraph}<w:sectPr><w:bidi/></w:sectPr></w:body></w:document>`);
   return zip.generateAsync({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
