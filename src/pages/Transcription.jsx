@@ -3,7 +3,6 @@ import LoginPage from '../components/LoginPage';
 import MediaSource from '../components/transcription/MediaSource';
 import TranscriptionResults from '../components/transcription/TranscriptionResults';
 import TranscriptionSettings from '../components/transcription/TranscriptionSettings';
-import {kc} from "../api/UserManager";
 import mqtt from "../api/mqtt";
 import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile} from "../api/exec";
 import {saveBlob} from "../utils";
@@ -14,7 +13,6 @@ class Transcription extends Component {
     state = {
         pass: false,
         user: null,
-        roles: [],
         percent: 0,
         progress: 0,
         serviceAlive: false,
@@ -33,14 +31,8 @@ class Transcription extends Component {
     }
 
     checkPermission = (user) => {
-        const trl_public = kc.hasRealmRole("bb_user");
-        if(trl_public) {
-            this.setState({user, roles: user.roles});
-            this.initMQTT(user);
-        } else {
-            alert("Access denied!");
-            kc.logout();
-        }
+        this.setState({user});
+        this.initMQTT(user);
     };
 
     progress = (step, file) => {
@@ -197,12 +189,10 @@ class Transcription extends Component {
     }
 
     render() {
-        const {user, roles, stButton} = this.state;
+        const {user, stButton} = this.state;
 
-        let opt = roles.map((role,i) => {
-            if(role === "bb_user") {
-                return (
-                    <Card key={i} className="text-base">
+        const opt = (
+                    <Card className="text-base">
                         <MediaSource
                             inputFile={this.state.inputFile}
                             onInputFileChange={this.handleInputFileChange}
@@ -237,9 +227,6 @@ class Transcription extends Component {
                         </Button>
 
                     </Card>);
-            }
-            return null
-        });
 
         return (
             <Fragment>
