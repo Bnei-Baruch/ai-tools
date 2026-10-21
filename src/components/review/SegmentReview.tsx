@@ -3,6 +3,8 @@ import type { ChunkReview, ErrorCategory, ReviewResult, ReviewSegment, ReviewSet
 import VideoPlayer from '../stt/VideoPlayer';
 import useActiveSeconds from '../../review/useActiveSeconds';
 import useReviewSaver, { type SaveState } from '../../review/useReviewSaver';
+import { exportFileName, reviewedChunks, transcriptBlob, type ExportFormat } from '../../review/exportTranscript';
+import { saveBlob } from '../../utils';
 import ReviewChunkList from './ReviewChunkList';
 import { CATEGORIES } from './categories';
 import { formatClock } from './format';
@@ -44,7 +46,9 @@ export const SAVE_LABELS: Record<SaveState, string> = {
   error: 'לא נשמר — ננסה שוב',
 };
 
-const collapse = (text: string) => text.replace(/\s+/g, ' ').trim();
+const EXPORT_FORMATS: ExportFormat[] = ['txt', 'srt', 'docx'];
+
+const collapse =(text: string) => text.replace(/\s+/g, ' ').trim();
 
 export default function SegmentReview({ set, segment, reviewer, initial, keysEnabled, onChange, onBack, onFinish, onHelp }: Props) {
   const { chunks, start, end } = segment;
@@ -282,6 +286,12 @@ export default function SegmentReview({ set, segment, reviewer, initial, keysEna
     onFinish();
   }
 
+  // the transcript with the corrections made so far (the line being edited included)
+  async function download(format: ExportFormat) {
+    commit(false);
+    saveBlob(await transcriptBlob(reviewedChunks(chunks, editsRef.current), format), exportFileName(segment.title, format));
+  }
+
   // --- keyboard: plain keys outside text fields, Alt+key inside them
 
   function onKey(e: KeyboardEvent) {
@@ -385,6 +395,12 @@ export default function SegmentReview({ set, segment, reviewer, initial, keysEna
               <span className="badge badge--run">{incomplete.length} ממתינים לסוג טעות</span>
             )}
             <span className="transcript__actions">
+              {EXPORT_FORMATS.map((format) => (
+                <button key={format} type="button" className="btn btn--ghost" title="הורדת התמלול עם התיקונים"
+                        onMouseDown={(e) => e.preventDefault()} onClick={() => void download(format)}>
+                  ⬇ {format}
+                </button>
+              ))}
               <button type="button" className="btn btn--primary" disabled={incomplete.length > 0} onClick={finish}>
                 סיימתי
               </button>
