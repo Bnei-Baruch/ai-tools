@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { GOOGLE_CLIENT_ID, LIVE_STREAM_URL } from '../consts';
 import { BrowserDocWriter, docId, docUrl, loadGis } from '../api/gdoc';
+import { kc } from '../api/UserManager';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import {
   addListenerDoc, dropListenerDoc, listenLive, liveResult, startLive, stopLive,
@@ -120,6 +121,8 @@ export default function Live() {
   // this page writing a doc of its user's
   const writer = useRef<BrowserDocWriter | null>(null);
   const [myDoc, setMyDoc] = useState<string | null>(null);
+  // the Google token ran out: words wait for a click on "renew"
+  const [needsGoogle, setNeedsGoogle] = useState(false);
   const finalsRef = useRef<LiveWord[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -301,7 +304,8 @@ export default function Live() {
     setDocBusy(true);
     setDocError(null);
     try {
-      const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError);
+      const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, kc.tokenParsed?.email ?? '');
+      w.onNeedsGoogle = setNeedsGoogle;
       if (busy) w.push(finalsRef.current.map((f) => f.word));
       stopMyDoc();
       writer.current = w;
@@ -319,6 +323,7 @@ export default function Live() {
     if (!w) return;
     writer.current = null;
     setMyDoc(null);
+    setNeedsGoogle(false);
     void w.stop();
     if (jobId && busy) void dropListenerDoc(jobId, docUrl(w.id));
   }
@@ -455,6 +460,12 @@ export default function Live() {
               <span className="muted" dir="auto">{d.url === myDoc ? 'שלי' : d.by}</span>
             </div>
           ))}
+          {myDoc && needsGoogle && (
+            <button type="button" className="btn btn--primary"
+              onClick={() => writer.current?.reauth().catch((err) => setDocError(String(err?.message ?? err)))}>
+              חדש גישה ל-Google (הטקסט ממתין)
+            </button>
+          )}
           {myDoc ? (
             <button type="button" className="btn" onClick={stopMyDoc}>הפסק לכתוב למסמך שלי</button>
           ) : (
