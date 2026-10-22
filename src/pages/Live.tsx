@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { LIVE_STREAM_URL } from '../consts';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import { cancelLive, listenLive, liveResult, startLive, stopLive, type LiveEvent, type LiveWord } from '../api/live';
 import useObjectUrl from '../hooks/useObjectUrl';
@@ -6,14 +7,19 @@ import ErrorAlert from '../components/stt/ErrorAlert';
 import VideoPlayer from '../components/stt/VideoPlayer';
 import '../components/live/live.css';
 
-// Live transcription (תמלול חי), TASK-live-transcription.md in ai-trns: the server reads the media at its
-// natural pace, as if it were a broadcast, and the text comes in while the player plays it.
+// Live transcription (תמלול חי), TASK-live-transcription.md in ai-trns: the broadcast (LIVE_STREAM_URL, HLS)
+// or a recording, which the server reads at its natural pace as if it were broadcast; the text comes in while
+// the player plays it.
 
 interface Media {
   audio: string;
   video?: string;
   title?: string;
+  // the broadcast: no timeline to highlight words on or seek in
+  stream?: boolean;
 }
+
+type Source = 'broadcast' | 'link';
 
 type State = 'idle' | 'waiting' | 'live' | 'stopping' | 'ended';
 
@@ -30,6 +36,9 @@ const HIGHLIGHT_TAIL = 0.6;
 
 // A kabbalahmedia.info lesson link -> its Hebrew audio (and video); otherwise a direct media link.
 async function resolveMedia(link: string): Promise<Media> {
+  if (/\.(m3u8|mpd)(\?|$)/i.test(new URL(link, window.location.href).pathname + '?')) {
+    return { audio: link, stream: true };
+  }
   const uid = parseUnitUid(link);
   if (uid) {
     const unit = await fetchUnit(uid);
@@ -66,7 +75,21 @@ function fmt(s: number): string {
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
+// HLS in a <video>: natively in Safari, through hls.js elsewhere. Returns a cleanup.
+async function attachStream(video: HTMLVideoElement, url: string): Promise<() => void> {
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    return () => video.removeAttribute('src');
+  }
+  const { default: Hls } = await import('hls.js');
+  const hls = new Hls({ liveSyncDurationCount: 3 });
+  hls.loadSource(url);
+  hls.attachMedia(video);
+  return () => hls.destroy();
+}
+
 export default function Live() {
+  const [source, setSource] = useState<Source>(LIVE_STREAM_URL ? 'broadcast' : 'link');
   const [link, setLink] = useState('https://cdn.kabbalahmedia.info/K8X56H7k');
   const [media, setMedia] = useState<Media | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -88,7 +111,8 @@ export default function Live() {
   const txtUrl = useObjectUrl(txt, 'text/plain');
 
   const busy = state === 'waiting' || state === 'live' || state === 'stopping';
-  const current = wordAt(finals, currentTime);
+  const stream = !!media?.stream;
+  const current = stream ? -1 : wordAt(finals, currentTime);
   const lastEnd = finals.length ? finals[finals.length - 1].end_s : 0;
 
   // leaving the page ends the stream on the server too
@@ -106,10 +130,26 @@ export default function Live() {
     if (follow && el) el.scrollTop = el.scrollHeight;
   }, [finals, partial, follow]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!media?.stream || !video) return;
+    let cleanup: (() => void) | null = null;
+    let gone = false;
+    attachStream(video, media.audio).then(
+      (c) => (gone ? c() : (cleanup = c)),
+      (err) => setError(err instanceof Error ? err.message : String(err)),
+    );
+    return () => {
+      gone = true;
+      cleanup?.();
+    };
+  }, [media]);
+
   function play() {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = 0;
+    // a recording plays from where the server starts reading it; the broadcast from its live edge
+    if (!media?.stream) video.currentTime = 0;
     video.play().then(
       () => setBlocked(false),
       () => setBlocked(true),
@@ -169,7 +209,7 @@ export default function Live() {
     abort.current = controller;
     let id: string | null = null;
     try {
-      const m = await resolveMedia(link);
+      const m = await resolveMedia(source === 'broadcast' && LIVE_STREAM_URL ? LIVE_STREAM_URL : link);
       setMedia(m);
       id = await startLive(m.audio);
       setJobId(id);
@@ -198,7 +238,7 @@ export default function Live() {
 
   function seek(t: number) {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || stream) return;
     video.currentTime = t;
     void video.play().catch(() => {});
   }
@@ -218,11 +258,25 @@ export default function Live() {
         <header className="card__header">
           <h1>תמלול חי</h1>
           <p className="muted">
-            קישור לשיעור או לקובץ — השרת מתמלל אותו בקצב השמעה, כמו שידור חי, והטקסט מופיע תוך כדי ניגון.
+            השידור החי, או קישור לשיעור / קובץ שהשרת מתמלל בקצב השמעה — הטקסט מופיע תוך כדי ניגון.
           </p>
         </header>
         <form onSubmit={handleStart}>
-          <div className="field">
+          {LIVE_STREAM_URL && (
+            <div className="field live__source">
+              <label className="live__option">
+                <input type="radio" name="live-source" checked={source === 'broadcast'} disabled={busy}
+                  onChange={() => setSource('broadcast')} />
+                שידור חי
+              </label>
+              <label className="live__option">
+                <input type="radio" name="live-source" checked={source === 'link'} disabled={busy}
+                  onChange={() => setSource('link')} />
+                שיעור / קובץ
+              </label>
+            </div>
+          )}
+          {source === 'link' && <div className="field">
             <label className="field__label" htmlFor="live-url">קישור</label>
             <input
               id="live-url"
@@ -234,7 +288,7 @@ export default function Live() {
               onChange={(e) => setLink(e.target.value)}
               disabled={busy}
             />
-          </div>
+          </div>}
           {busy ? (
             <button type="button" className="btn btn--block live__stop" onClick={handleStop}
               disabled={state !== 'live'}>
@@ -248,7 +302,8 @@ export default function Live() {
               )}
             </button>
           ) : (
-            <button type="submit" className="btn btn--primary btn--block" disabled={!link.trim()}>
+            <button type="submit" className="btn btn--primary btn--block"
+              disabled={source === 'link' && !link.trim()}>
               התחל
             </button>
           )}
@@ -259,20 +314,26 @@ export default function Live() {
       {media && (
         <div className="live">
           <div className="live__side">
-            <VideoPlayer
-              src={media.video ?? media.audio}
-              trackUrl={null}
-              trackLabel=""
-              videoRef={videoRef}
-              onTimeUpdate={setCurrentTime}
-              className="live__player"
-            />
+            {stream ? (
+              <div className="player live__player">
+                <video ref={videoRef} controls playsInline />
+              </div>
+            ) : (
+              <VideoPlayer
+                src={media.video ?? media.audio}
+                trackUrl={null}
+                trackLabel=""
+                videoRef={videoRef}
+                onTimeUpdate={setCurrentTime}
+                className="live__player"
+              />
+            )}
             {blocked && (
               <button type="button" className="btn btn--primary btn--block" onClick={play}>
                 ▶ הפעל את הנגן
               </button>
             )}
-            {media.title && <div className="live__title">{media.title}</div>}
+            {(media.title || stream) && <div className="live__title">{media.title ?? 'שידור חי'}</div>}
             <div className="live__status">
               {state !== 'idle' && <span className={`live__pill live__pill--${state}`}>{STATE_LABELS[state]}</span>}
               {state === 'live' && (
@@ -300,7 +361,7 @@ export default function Live() {
               {finals.map((w, i) => (
                 <span key={i}>
                   <span
-                    className={i === current ? 'lw lw--now' : 'lw'}
+                    className={i === current ? 'lw lw--now' : stream ? 'lw lw--static' : 'lw'}
                     onClick={() => seek(w.start_s)}
                     title={fmt(w.start_s)}
                   >

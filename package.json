@@ -16,6 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "docx-preview": "^0.4.1",
+    "hls.js": "1.5.20",
     "jszip": "^3.10.2",
     "keycloak-js": "^26.2.4",
     "mqtt": "5.16.1",

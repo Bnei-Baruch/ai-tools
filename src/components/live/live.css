@@ -34,6 +34,9 @@
   }
   .lw { border-radius: 4px; padding: 0 1px; cursor: pointer; }
   .lw:hover { background: var(--primary-soft); }
+  .lw--static { cursor: default; }
+  .lw--static:hover { background: none; }
+  .live__source { display: flex; gap: 20px; }
   .lw--now { background: #fde68a; }
   .lw--partial { color: var(--muted); }
   .live__follow { position: absolute; bottom: 12px; inset-inline-start: 12px; padding: 4px 12px; }

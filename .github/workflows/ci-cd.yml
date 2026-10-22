@@ -40,6 +40,7 @@ jobs:
           REACT_APP_STT_URL: ${{ vars.REACT_APP_STT_URL }}
           REACT_APP_ALIGN_URL: ${{ vars.REACT_APP_ALIGN_URL }}
           REACT_APP_REVIEW_API: ${{ vars.REACT_APP_REVIEW_API }}
+          REACT_APP_LIVE_STREAM_URL: ${{ vars.REACT_APP_LIVE_STREAM_URL }}
 
       - uses: actions/upload-artifact@v7
         with:

@@ -11,6 +11,8 @@ export const STT_URL = import.meta.env.REACT_APP_STT_URL || 'https://ai-tools.ka
 export const ALIGN_URL = import.meta.env.REACT_APP_ALIGN_URL;
 // STT review: "local" -- see api/review.ts; otherwise ai-trns.
 export const REVIEW_API = import.meta.env.REACT_APP_REVIEW_API;
+// Live transcription (תמלול חי): the broadcast's HLS stream
+export const LIVE_STREAM_URL = import.meta.env.REACT_APP_LIVE_STREAM_URL;
 // All reviewers share one set (the API routes still take a set id).
 export const REVIEW_SET = 'main';
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.
