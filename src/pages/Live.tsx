@@ -3,6 +3,7 @@ import { LIVE_STREAM_URL } from '../consts';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import { listenLive, liveResult, startLive, stopLive, type LiveEvent, type LiveWord } from '../api/live';
 import useObjectUrl from '../hooks/useObjectUrl';
+import { exportFileName, transcriptBlob } from '../review/exportTranscript';
 import ErrorAlert from '../components/stt/ErrorAlert';
 import VideoPlayer from '../components/stt/VideoPlayer';
 import '../components/live/live.css';
@@ -104,12 +105,10 @@ export default function Live() {
   const [follow, setFollow] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [srt, setSrt] = useState<string | null>(null);
-  const [txt, setTxt] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
   const srtUrl = useObjectUrl(srt, 'application/x-subrip');
-  const txtUrl = useObjectUrl(txt, 'text/plain');
 
   const busy = state === 'waiting' || state === 'live' || state === 'stopping';
   const stream = !!media?.stream;
@@ -177,13 +176,7 @@ export default function Live() {
       case 'end':
         setPartial([]);
         setState('ended');
-        Promise.all([liveResult(id, 'srt'), liveResult(id, 'txt')]).then(
-          ([s, t]) => {
-            setSrt(s);
-            setTxt(t);
-          },
-          (err) => setError(err instanceof Error ? err.message : String(err)),
-        );
+        liveResult(id, 'srt').then(setSrt, (err) => setError(err instanceof Error ? err.message : String(err)));
         break;
       case 'error':
         setPartial([]);
@@ -203,7 +196,6 @@ export default function Live() {
     setPartial([]);
     setHeard(0);
     setSrt(null);
-    setTxt(null);
     setBlocked(false);
     setFollow(true);
     setState('waiting');
@@ -257,18 +249,25 @@ export default function Live() {
     await navigator.clipboard.writeText(finals.map((w) => w.word).join(' ')).catch(() => {});
   }
 
+  // txt / docx of the final words so far (during the stream too); SRT is the server's, at the end
+  async function download(format: 'txt' | 'docx') {
+    const text = finals.map((w) => w.word).join(' ');
+    const blob = await transcriptBlob([{ start: 0, end: lastEnd, text }], format);
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '-');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = exportFileName(`${media?.title ?? 'תמלול חי'} ${stamp}`, format);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
   return (
-    <>
-      <div className="card">
-        <header className="card__header">
-          <h1>תמלול חי</h1>
-          <p className="muted">
-            השידור החי, או קישור לשיעור / קובץ שהשרת מתמלל בקצב השמעה — הטקסט מופיע תוך כדי ניגון.
-          </p>
-        </header>
-        <form onSubmit={handleStart}>
+    <div className="live">
+      <div className="live__side">
+        <h1 className="live__h1">תמלול חי</h1>
+        <form onSubmit={handleStart} className="live__form">
           {LIVE_STREAM_URL && (
-            <div className="field live__source">
+            <div className="live__source">
               <label className="live__option">
                 <input type="radio" name="live-source" checked={source === 'broadcast'} disabled={busy}
                   onChange={() => setSource('broadcast')} />
@@ -281,19 +280,19 @@ export default function Live() {
               </label>
             </div>
           )}
-          {source === 'link' && <div className="field">
-            <label className="field__label" htmlFor="live-url">קישור</label>
+          {source === 'link' && (
             <input
               id="live-url"
               type="text"
               className="input"
               dir="ltr"
+              aria-label="קישור"
               placeholder="https://kabbalahmedia.info/he/lessons/cu/5JBUHZoo"
               value={link}
               onChange={(e) => setLink(e.target.value)}
               disabled={busy}
             />
-          </div>}
+          )}
           {busy ? (
             <button type="button" className="btn btn--block live__stop" onClick={handleStop}
               disabled={state !== 'live'}>
@@ -309,17 +308,15 @@ export default function Live() {
           ) : (
             <button type="submit" className="btn btn--primary btn--block"
               disabled={source === 'link' && !link.trim()}>
-              התחל
+              התחל תמלול
             </button>
           )}
         </form>
         <ErrorAlert error={error} />
-        {note && <p className="muted center">{note}</p>}
-      </div>
+        {note && <p className="muted">{note}</p>}
 
-      {media && (
-        <div className="live">
-          <div className="live__side">
+        {media && (
+          <>
             {stream ? (
               <div className="player live__player">
                 <video ref={videoRef} controls playsInline />
@@ -340,51 +337,54 @@ export default function Live() {
               </button>
             )}
             {(media.title || stream) && <div className="live__title">{media.title ?? 'שידור חי'}</div>}
-            <div className="live__status">
-              {state !== 'idle' && <span className={`live__pill live__pill--${state}`}>{STATE_LABELS[state]}</span>}
-              {state === 'live' && (
-                <span className="muted" title="עד כאן השרת שמע / עד כאן הטקסט סופי">
-                  שמע {fmt(heard)} · טקסט {fmt(lastEnd)}
-                </span>
-              )}
-            </div>
-            <label className="live__option">
-              <input type="checkbox" checked={showPartial} onChange={(e) => setShowPartial(e.target.checked)} />
-              הצג טקסט זמני (אפור)
-            </label>
-            <div className="live__buttons">
-              <button type="button" className="btn" onClick={copyText} disabled={!finals.length}>העתק</button>
-              {srtUrl && <a className="btn" href={srtUrl} download={`${jobId}.srt`}>SRT</a>}
-              {txtUrl && <a className="btn" href={txtUrl} download={`${jobId}.txt`}>TXT</a>}
-            </div>
-          </div>
-
-          <div className="live__text-wrap">
-            <div className="live__text" ref={textRef} onScroll={onScroll}>
-              {!finals.length && !partial.length && (
-                <p className="muted">{state === 'waiting' ? 'ממתין לשרת…' : 'הטקסט יופיע כאן תוך כמה שניות.'}</p>
-              )}
-              {finals.map((w, i) => (
-                <span key={i}>
-                  <span
-                    className={i === current ? 'lw lw--now' : stream ? 'lw lw--static' : 'lw'}
-                    onClick={() => seek(w.start_s)}
-                    title={fmt(w.start_s)}
-                  >
-                    {w.word}
-                  </span>{' '}
-                </span>
-              ))}
-              {showPartial && <span className="lw--partial">{partial.map((w) => w.word).join(' ')}</span>}
-            </div>
-            {!follow && (
-              <button type="button" className="btn live__follow" onClick={() => setFollow(true)}>
-                ↓ לסוף
-              </button>
-            )}
-          </div>
+          </>
+        )}
+        <div className="live__status">
+          {state !== 'idle' && <span className={`live__pill live__pill--${state}`}>{STATE_LABELS[state]}</span>}
+          {state === 'live' && (
+            <span className="muted" title="עד כאן השרת שמע / עד כאן הטקסט סופי">
+              שמע {fmt(heard)} · טקסט {fmt(lastEnd)}
+            </span>
+          )}
         </div>
-      )}
-    </>
+        <label className="live__option">
+          <input type="checkbox" checked={showPartial} onChange={(e) => setShowPartial(e.target.checked)} />
+          הצג טקסט זמני (אפור)
+        </label>
+        <div className="live__buttons">
+          <button type="button" className="btn" onClick={copyText} disabled={!finals.length}>העתק</button>
+          <button type="button" className="btn" onClick={() => download('txt')} disabled={!finals.length}>TXT</button>
+          <button type="button" className="btn" onClick={() => download('docx')} disabled={!finals.length}>DOCX</button>
+          {srtUrl && <a className="btn" href={srtUrl} download={`${jobId}.srt`}>SRT</a>}
+        </div>
+      </div>
+
+      <div className="live__text-wrap">
+        <div className="live__text" ref={textRef} onScroll={onScroll}>
+          {!finals.length && !partial.length && (
+            <p className="muted">
+              {state === 'waiting' ? 'ממתין לשרת…' : 'השידור החי, או קישור לשיעור / קובץ שהשרת מתמלל בקצב השמעה — הטקסט יופיע כאן תוך כדי ניגון.'}
+            </p>
+          )}
+          {finals.map((w, i) => (
+            <span key={i}>
+              <span
+                className={i === current ? 'lw lw--now' : stream ? 'lw lw--static' : 'lw'}
+                onClick={() => seek(w.start_s)}
+                title={fmt(w.start_s)}
+              >
+                {w.word}
+              </span>{' '}
+            </span>
+          ))}
+          {showPartial && <span className="lw--partial">{partial.map((w) => w.word).join(' ')}</span>}
+        </div>
+        {!follow && (
+          <button type="button" className="btn live__follow" onClick={() => setFollow(true)}>
+            ↓ לסוף
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
