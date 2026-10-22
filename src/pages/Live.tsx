@@ -139,13 +139,15 @@ export default function Live() {
     void writer.current?.stop();
   }, []);
 
-  // while this page writes its doc, keep it on the list the other listeners see
+  // while this page writes its doc during a stream, keep it on the list the other listeners see
   useEffect(() => {
-    if (!myDoc || !jobId) return;
+    if (!myDoc || !jobId || !busy) return;
     const title = writer.current?.title ?? '';
-    const timer = window.setInterval(() => void addListenerDoc(jobId, myDoc, title).catch(() => {}), DOC_ALIVE_MS);
+    const tell = () => void addListenerDoc(jobId, myDoc, title).catch(() => {});
+    tell();
+    const timer = window.setInterval(tell, DOC_ALIVE_MS);
     return () => window.clearInterval(timer);
-  }, [myDoc, jobId]);
+  }, [myDoc, jobId, busy]);
 
   // the consent popup must open right on the click: have Google's script ready before it
   useEffect(() => {
@@ -215,7 +217,6 @@ export default function Live() {
       case 'end':
         setPartial([]);
         setState('ended');
-        stopMyDoc(id);
         liveResult(id, 'srt').then(setSrt, (err) => setError(err instanceof Error ? err.message : String(err)));
         break;
       case 'error':
@@ -235,7 +236,6 @@ export default function Live() {
     setServerDoc(null);
     setListenerDocs([]);
     setDocError(null);
-    if (jobId) stopMyDoc(jobId);
     setFinals([]);
     setPartial([]);
     setHeard(0);
@@ -290,8 +290,9 @@ export default function Live() {
   }
 
   // this page writes the text into a doc of its user's too, from now on (what is final so far first)
+  // also before a stream starts: it is written from the start on. It goes on across streams until stopped
   async function writeMyDoc() {
-    if (!jobId || !GOOGLE_CLIENT_ID) return;
+    if (!GOOGLE_CLIENT_ID) return;
     const id = docId(docLink);
     if (!id) {
       setDocError('קישור למסמך Google Docs: https://docs.google.com/document/d/...');
@@ -301,12 +302,11 @@ export default function Live() {
     setDocError(null);
     try {
       const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError);
-      w.push(finalsRef.current.map((f) => f.word));
-      stopMyDoc(jobId);
+      if (busy) w.push(finalsRef.current.map((f) => f.word));
+      stopMyDoc();
       writer.current = w;
       setMyDoc(docUrl(id));
       setDocLink('');
-      await addListenerDoc(jobId, docUrl(id), w.title);
     } catch (err) {
       setDocError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -314,16 +314,15 @@ export default function Live() {
     }
   }
 
-  function stopMyDoc(id: string) {
+  function stopMyDoc() {
     const w = writer.current;
     if (!w) return;
     writer.current = null;
     setMyDoc(null);
     void w.stop();
-    void dropListenerDoc(id, docUrl(w.id));
+    if (jobId && busy) void dropListenerDoc(jobId, docUrl(w.id));
   }
 
-  const showDocs = !!jobId && !!(serverDoc || listenerDocs.length || (GOOGLE_CLIENT_ID && busy));
 
   async function copyText() {
     await navigator.clipboard.writeText(finals.map((w) => w.word).join(' ')).catch(() => {});
@@ -438,52 +437,51 @@ export default function Live() {
           {srtUrl && <a className="btn" href={srtUrl} download={`${jobId}.srt`}>SRT</a>}
         </div>
 
-        {showDocs && (
-          <div className="live__doc">
-            <div className="live__doc-title">Google Docs</div>
-            {serverDoc && (
-              serverDoc.url ? (
-                <div className="live__doc-row">
-                  <a href={serverDoc.url} target="_blank" rel="noreferrer" dir="auto">{serverDoc.title || 'מסמך השידור'}</a>
-                  <span className="muted">מסמך השידור</span>
-                </div>
-              ) : (
-                <span className="muted">מסמך השידור לא נוצר: <span dir="auto">{serverDoc.error}</span></span>
-              )
-            )}
-            {listenerDocs.map((d) => (
-              <div className="live__doc-row" key={d.url}>
-                <a href={d.url} target="_blank" rel="noreferrer" dir="auto">{d.title || 'מסמך'}</a>
-                <span className="muted" dir="auto">{d.url === myDoc ? 'שלי' : d.by}</span>
+        <div className="live__doc">
+          <div className="live__doc-title">Google Docs</div>
+          {serverDoc && (
+            serverDoc.url ? (
+              <div className="live__doc-row">
+                <a href={serverDoc.url} target="_blank" rel="noreferrer" dir="auto">{serverDoc.title || 'מסמך השידור'}</a>
+                <span className="muted">מסמך השידור</span>
               </div>
-            ))}
-            {GOOGLE_CLIENT_ID && busy && (
-              myDoc ? (
-                <button type="button" className="btn" onClick={() => jobId && stopMyDoc(jobId)}>
-                  הפסק לכתוב למסמך שלי
-                </button>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    className="input"
-                    dir="ltr"
-                    aria-label="קישור ל-Google Doc שלי"
-                    placeholder="https://docs.google.com/document/d/..."
-                    value={docLink}
-                    onChange={(e) => setDocLink(e.target.value)}
-                    disabled={docBusy}
-                  />
-                  <button type="button" className="btn" onClick={writeMyDoc} disabled={docBusy || !docLink.trim()}>
-                    כתוב גם למסמך שלי
-                  </button>
-                  <span className="muted live__doc-hint">מחשבון ה-Google שלכם, כל עוד הדף פתוח</span>
-                </>
-              )
-            )}
-            {docError && <div className="alert alert--error" role="alert" dir="auto">{docError}</div>}
-          </div>
-        )}
+            ) : (
+              <span className="muted">מסמך השידור לא נוצר: <span dir="auto">{serverDoc.error}</span></span>
+            )
+          )}
+          {listenerDocs.map((d) => (
+            <div className="live__doc-row" key={d.url}>
+              <a href={d.url} target="_blank" rel="noreferrer" dir="auto">{d.title || 'מסמך'}</a>
+              <span className="muted" dir="auto">{d.url === myDoc ? 'שלי' : d.by}</span>
+            </div>
+          ))}
+          {myDoc ? (
+            <button type="button" className="btn" onClick={stopMyDoc}>הפסק לכתוב למסמך שלי</button>
+          ) : (
+            <>
+              <input
+                type="text"
+                className="input"
+                dir="ltr"
+                aria-label="קישור ל-Google Doc שלי"
+                placeholder="https://docs.google.com/document/d/..."
+                value={docLink}
+                onChange={(e) => setDocLink(e.target.value)}
+                disabled={docBusy || !GOOGLE_CLIENT_ID}
+              />
+              <button type="button" className="btn" onClick={writeMyDoc}
+                disabled={docBusy || !GOOGLE_CLIENT_ID || !docLink.trim()}>
+                כתוב למסמך שלי
+              </button>
+              <span className="muted live__doc-hint">
+                {GOOGLE_CLIENT_ID
+                  ? 'מחשבון ה-Google שלכם, כל עוד הדף פתוח'
+                  : 'כתיבה למסמך Google אישי עדיין לא הוגדרה'}
+              </span>
+            </>
+          )}
+          {docError && <div className="alert alert--error" role="alert" dir="auto">{docError}</div>}
+        </div>
       </div>
 
       <div className="live__text-wrap">
