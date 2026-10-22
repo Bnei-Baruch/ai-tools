@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { LIVE_STREAM_URL } from '../consts';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
-import { cancelLive, listenLive, liveResult, startLive, stopLive, type LiveEvent, type LiveWord } from '../api/live';
+import { listenLive, liveResult, startLive, stopLive, type LiveEvent, type LiveWord } from '../api/live';
 import useObjectUrl from '../hooks/useObjectUrl';
 import ErrorAlert from '../components/stt/ErrorAlert';
 import VideoPlayer from '../components/stt/VideoPlayer';
@@ -95,6 +95,7 @@ export default function Live() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [state, setState] = useState<State>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [finals, setFinals] = useState<LiveWord[]>([]);
   const [partial, setPartial] = useState<LiveWord[]>([]);
   const [heard, setHeard] = useState(0);
@@ -197,6 +198,7 @@ export default function Live() {
     e.preventDefault();
     abort.current?.abort();
     setError(null);
+    setNote(null);
     setFinals([]);
     setPartial([]);
     setHeard(0);
@@ -207,21 +209,17 @@ export default function Live() {
     setState('waiting');
     const controller = new AbortController();
     abort.current = controller;
-    let id: string | null = null;
+    // a page that goes away just stops listening: a job nobody listens to is finished by the server
     try {
       const m = await resolveMedia(source === 'broadcast' && LIVE_STREAM_URL ? LIVE_STREAM_URL : link);
       setMedia(m);
-      id = await startLive(m.audio);
+      const id = await startLive(m.audio);
       setJobId(id);
-      const jobIdNow = id;
-      await listenLive(jobIdNow, (ev) => onEvent(ev, jobIdNow), controller.signal);
+      await listenLive(id, (ev) => onEvent(ev, id), controller.signal);
     } catch (err) {
       if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : String(err));
       setState('ended');
-    } finally {
-      // the page went away or a new stream started: this one is not needed anymore
-      if (controller.signal.aborted && id) void cancelLive(id);
     }
   }
 
@@ -230,7 +228,14 @@ export default function Live() {
     setState('stopping');
     videoRef.current?.pause();
     try {
-      await stopLive(jobId);
+      const { stopping, listeners } = await stopLive(jobId);
+      if (!stopping) {
+        // others still listen: the broadcast goes on for them, this page leaves it
+        abort.current?.abort();
+        setPartial([]);
+        setState('ended');
+        setNote(`השידור ממשיך עבור ${listeners} מאזינים נוספים`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -309,6 +314,7 @@ export default function Live() {
           )}
         </form>
         <ErrorAlert error={error} />
+        {note && <p className="muted center">{note}</p>}
       </div>
 
       {media && (

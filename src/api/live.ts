@@ -36,13 +36,14 @@ export async function startLive(url: string): Promise<string> {
   return ((await res.json()) as Job).id;
 }
 
-export async function stopLive(jobId: string): Promise<void> {
+// Leave the stream. The last one listening finishes it (stopping: true, the result follows as "end");
+// otherwise it goes on for the others (a broadcast is one job for everyone) and the caller just leaves.
+// Nobody listening finishes it on the server too, so closing the page needs no call.
+export async function stopLive(jobId: string): Promise<{ stopping: boolean; listeners: number }> {
   const res = await aiTrnsFetch(`/live/${jobId}/stop`, { method: 'POST' });
-  if (!res.ok && res.status !== 409) throw await errorFrom(res);
-}
-
-export async function cancelLive(jobId: string): Promise<void> {
-  await aiTrnsFetch(`/jobs/${jobId}`, { method: 'DELETE' }).catch(() => {});
+  if (res.status === 409) return { stopping: true, listeners: 0 };
+  if (!res.ok) throw await errorFrom(res);
+  return res.json();
 }
 
 // Server-sent events through fetch, so the request carries the token (EventSource can't).
