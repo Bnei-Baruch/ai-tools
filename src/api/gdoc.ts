@@ -1,8 +1,14 @@
 // Live text into a Google Doc from the browser, as the user (Google Identity Services token + Docs API).
-// Only while this page is open; the server can write it too, as its service account (ai-trns /live/{id}/doc).
+// Only while this page is open; the server writes a doc of its own too (ai-trns, its Google account).
+//
+// Scope drive.file: Google's non-sensitive one (no app verification), but it only reaches docs the app
+// created or the user picked in Google's picker, so a doc is made here (createDoc) or picked (pickDoc),
+// not pasted as a link. The picker needs an API key (REACT_APP_GOOGLE_API_KEY) and the project number,
+// which is the client id's first part.
 
-const SCOPE = 'https://www.googleapis.com/auth/documents';
+const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DOCS = 'https://docs.googleapis.com/v1/documents';
+const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const FLUSH_MS = 3000;
 
 interface TokenResponse {
@@ -19,7 +25,9 @@ interface TokenClient {
 
 declare global {
   interface Window {
+    gapi?: { load: (name: string, callback: () => void) => void };
     google?: {
+      picker?: any;
       accounts: {
         oauth2: {
           initTokenClient: (config: {
@@ -41,21 +49,33 @@ export function docId(url: string): string | null {
 
 export const docUrl = (id: string) => `https://docs.google.com/document/d/${id}/edit`;
 
-let gis: Promise<void> | null = null;
+const scripts = new Map<string, Promise<void>>();
 
-export function loadGis(): Promise<void> {
-  gis ??= new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      gis = null;
-      reject(new Error('Google אינו זמין'));
-    };
-    document.head.appendChild(script);
-  });
-  return gis;
+function loadScript(src: string): Promise<void> {
+  let loading = scripts.get(src);
+  if (!loading) {
+    loading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        scripts.delete(src);
+        reject(new Error('Google אינו זמין'));
+      };
+      document.head.appendChild(script);
+    });
+    scripts.set(src, loading);
+  }
+  return loading;
+}
+
+export const loadGis = () => loadScript('https://accounts.google.com/gsi/client');
+
+async function loadPicker(): Promise<void> {
+  await loadScript('https://apis.google.com/js/api.js');
+  if (window.google?.picker) return;
+  await new Promise<void>((resolve) => window.gapi!.load('picker', resolve));
 }
 
 // The Google token ran out and getting a new one needs the user: Google opens a popup, which browsers
@@ -128,7 +148,7 @@ async function api(clientId: string, method: string, path: string, body: unknown
   const a = googleAuth(clientId);
   for (let attempt = 0; ; attempt++) {
     const token = await a.accessToken(interactive);
-    const res = await fetch(`${DOCS}/${path}`, {
+    const res = await fetch(path.startsWith('https://') ? path : `${DOCS}/${path}`, {
       method,
       headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
@@ -142,6 +162,42 @@ async function api(clientId: string, method: string, path: string, body: unknown
     if (!res.ok) throw new Error(`Google ${res.status}: ${data?.error?.message ?? res.statusText}`);
     return data;
   }
+}
+
+// A new Google Doc in the user's Drive (asks for Google access: call it on a click); its id.
+export async function createDoc(clientId: string, title: string, hint = ''): Promise<string> {
+  googleAuth(clientId, hint);
+  const file = await api(clientId, 'POST', `${DRIVE}?fields=id`,
+    { name: title, mimeType: 'application/vnd.google-apps.document' }, true);
+  return file.id;
+}
+
+// The user picks one of their Google Docs in Google's picker (call it on a click); its id, or null if
+// they closed the picker. Picking it is what lets the app (drive.file) write it.
+export async function pickDoc(clientId: string, apiKey: string, hint = ''): Promise<string | null> {
+  const a = googleAuth(clientId, hint);
+  const token = await a.accessToken(true);
+  await loadPicker();
+  const picker = window.google!.picker;
+  return new Promise((resolve) => {
+    const docs = () => new picker.DocsView(picker.ViewId.DOCUMENTS).setMode(picker.DocsViewMode.LIST);
+    new picker.PickerBuilder()
+      // any doc the user can reach: their own, shared with them, on shared drives (writing needs edit rights)
+      .addView(docs().setOwnedByMe(true))
+      .addView(docs().setOwnedByMe(false))
+      .addView(docs().setEnableDrives(true))
+      .enableFeature(picker.Feature.SUPPORT_DRIVES)
+      .setOAuthToken(token)
+      .setDeveloperKey(apiKey)
+      .setAppId(clientId.split('-')[0])
+      .setLocale('iw')
+      .setCallback((data: any) => {
+        if (data.action === picker.Action.PICKED) resolve(data.docs[0].id);
+        else if (data.action === picker.Action.CANCEL) resolve(null);
+      })
+      .build()
+      .setVisible(true);
+  });
 }
 
 // Appends final words to the doc every FLUSH_MS until stop(). onError: a write failed (it is retried);

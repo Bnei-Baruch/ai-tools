@@ -42,6 +42,7 @@ jobs:
           REACT_APP_REVIEW_API: ${{ vars.REACT_APP_REVIEW_API }}
           REACT_APP_LIVE_STREAM_URL: ${{ vars.REACT_APP_LIVE_STREAM_URL }}
           REACT_APP_GOOGLE_CLIENT_ID: ${{ vars.REACT_APP_GOOGLE_CLIENT_ID }}
+          REACT_APP_GOOGLE_API_KEY: ${{ vars.REACT_APP_GOOGLE_API_KEY }}
 
       - uses: actions/upload-artifact@v7
         with:

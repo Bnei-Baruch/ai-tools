@@ -16,6 +16,8 @@ export const LIVE_STREAM_URL = import.meta.env.REACT_APP_LIVE_STREAM_URL;
 // Live text into a Google Doc from the browser, as the user: an OAuth client id (Google Cloud, web app,
 // this origin allowed, Docs API on); empty = off
 export const GOOGLE_CLIENT_ID = import.meta.env.REACT_APP_GOOGLE_CLIENT_ID;
+// Google's picker for choosing an existing doc: an API key (Picker API, restricted to this site); empty = new docs only
+export const GOOGLE_API_KEY = import.meta.env.REACT_APP_GOOGLE_API_KEY;
 // All reviewers share one set (the API routes still take a set id).
 export const REVIEW_SET = 'main';
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.
