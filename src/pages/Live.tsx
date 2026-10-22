@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { GOOGLE_API_KEY, GOOGLE_CLIENT_ID, LIVE_STREAM_URL } from '../consts';
-import { BrowserDocWriter, createDoc, docUrl, loadGis, pickDoc } from '../api/gdoc';
+import { BrowserDocWriter, GoogleError, createDoc, docId, docUrl, loadGis, pickDoc } from '../api/gdoc';
 import { kc } from '../api/UserManager';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import {
@@ -113,6 +113,7 @@ export default function Live() {
   const [follow, setFollow] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [srt, setSrt] = useState<string | null>(null);
+  const [docLink, setDocLink] = useState('');
   const [serverDoc, setServerDoc] = useState<ServerDoc | null>(null);
   const [listenerDocs, setListenerDocs] = useState<ListenerDoc[]>([]);
   const [docError, setDocError] = useState<string | null>(null);
@@ -295,22 +296,40 @@ export default function Live() {
   // also before a stream starts: it is written from the start on. It goes on across streams until stopped.
   // A new doc in the user's Drive, or one they pick (any they can edit): with the drive.file scope the app
   // reaches only those
-  async function writeMyDoc(how: 'new' | 'pick') {
+  async function writeMyDoc(how: 'new' | 'pick' | 'link') {
     if (!GOOGLE_CLIENT_ID) return;
+    const linked = how === 'link' ? docId(docLink) : null;
+    if (how === 'link' && !linked) {
+      setDocError('קישור למסמך Google Docs: https://docs.google.com/document/d/...');
+      return;
+    }
     setDocBusy(true);
     setDocError(null);
     try {
       const hint = kc.tokenParsed?.email ?? '';
-      const id = how === 'new'
+      let id = linked ?? (how === 'new'
         ? await createDoc(GOOGLE_CLIENT_ID, `תמלול חי ${new Date().toLocaleString('he-IL')}`, hint)
-        : await pickDoc(GOOGLE_CLIENT_ID, GOOGLE_API_KEY!, hint);
+        : await pickDoc(GOOGLE_CLIENT_ID, GOOGLE_API_KEY!, hint));
       if (!id) return;
-      const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, hint);
+      let w: BrowserDocWriter;
+      try {
+        w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, hint);
+      } catch (err) {
+        // a pasted doc the app may not open yet (drive.file): the user confirms it in Google's picker once
+        if (!(linked && err instanceof GoogleError && (err.status === 403 || err.status === 404))) throw err;
+        if (!GOOGLE_API_KEY) {
+          throw new Error('אין גישה למסמך הזה. צרו מסמך חדש כאן (בחירת מסמך קיים עדיין לא הוגדרה)');
+        }
+        id = await pickDoc(GOOGLE_CLIENT_ID, GOOGLE_API_KEY, hint, linked);
+        if (!id) return;
+        w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, hint);
+      }
       w.onNeedsGoogle = setNeedsGoogle;
       if (busy) w.push(finalsRef.current.map((f) => f.word));
       stopMyDoc();
       writer.current = w;
       setMyDoc(docUrl(id));
+      setDocLink('');
     } catch (err) {
       setDocError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -473,6 +492,18 @@ export default function Live() {
             </>
           ) : (
             <>
+              <input
+                type="text"
+                className="input"
+                dir="ltr"
+                aria-label="קישור ל-Google Doc"
+                placeholder="https://docs.google.com/document/d/..."
+                value={docLink}
+                onChange={(e) => setDocLink(e.target.value)}
+                disabled={docBusy || !GOOGLE_CLIENT_ID}
+              />
+              <button type="button" className="btn" onClick={() => writeMyDoc('link')}
+                disabled={docBusy || !GOOGLE_CLIENT_ID || !docLink.trim()}>כתוב למסמך הזה</button>
               <div className="live__buttons">
                 <button type="button" className="btn" onClick={() => writeMyDoc('new')}
                   disabled={docBusy || !GOOGLE_CLIENT_ID}>מסמך חדש שלי</button>

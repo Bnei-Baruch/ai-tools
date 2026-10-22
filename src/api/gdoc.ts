@@ -78,6 +78,16 @@ async function loadPicker(): Promise<void> {
   await new Promise<void>((resolve) => window.gapi!.load('picker', resolve));
 }
 
+// A Google API answered with an error status (403 / 404 for a doc the app may not open with drive.file)
+export class GoogleError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(`Google ${status}: ${message}`);
+    this.status = status;
+  }
+}
+
 // The Google token ran out and getting a new one needs the user: Google opens a popup, which browsers
 // only allow right on a click.
 export class NeedsGoogle extends Error {
@@ -159,7 +169,7 @@ async function api(clientId: string, method: string, path: string, body: unknown
       continue;
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`Google ${res.status}: ${data?.error?.message ?? res.statusText}`);
+    if (!res.ok) throw new GoogleError(res.status, data?.error?.message ?? res.statusText);
     return data;
   }
 }
@@ -173,19 +183,23 @@ export async function createDoc(clientId: string, title: string, hint = ''): Pro
 }
 
 // The user picks one of their Google Docs in Google's picker (call it on a click); its id, or null if
-// they closed the picker. Picking it is what lets the app (drive.file) write it.
-export async function pickDoc(clientId: string, apiKey: string, hint = ''): Promise<string | null> {
+// they closed the picker. Picking it is what lets the app (drive.file) write it. only: show just this doc
+// (a pasted link the app may not open yet: one click on "Select" grants it).
+export async function pickDoc(clientId: string, apiKey: string, hint = '', only = ''): Promise<string | null> {
   const a = googleAuth(clientId, hint);
   const token = await a.accessToken(true);
   await loadPicker();
   const picker = window.google!.picker;
   return new Promise((resolve) => {
     const docs = () => new picker.DocsView(picker.ViewId.DOCUMENTS).setMode(picker.DocsViewMode.LIST);
-    new picker.PickerBuilder()
+    const builder = new picker.PickerBuilder();
+    if (only) builder.addView(docs().setFileIds(only));
+    else {
       // any doc the user can reach: their own, shared with them, on shared drives (writing needs edit rights)
-      .addView(docs().setOwnedByMe(true))
-      .addView(docs().setOwnedByMe(false))
-      .addView(docs().setEnableDrives(true))
+      builder.addView(docs().setOwnedByMe(true)).addView(docs().setOwnedByMe(false))
+        .addView(docs().setEnableDrives(true));
+    }
+    builder
       .enableFeature(picker.Feature.SUPPORT_DRIVES)
       .setOAuthToken(token)
       .setDeveloperKey(apiKey)
