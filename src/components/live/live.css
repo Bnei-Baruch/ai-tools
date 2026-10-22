@@ -44,6 +44,8 @@
     display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border);
   }
   .live__doc-title { font-weight: 600; }
+  .live__doc-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .live__doc-row a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .live__doc .input { width: 100%; }
   .live__doc-hint { font-size: .8rem; word-break: break-all; }
   .lw--now { background: #fde68a; }

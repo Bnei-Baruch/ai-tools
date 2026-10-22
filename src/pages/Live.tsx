@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { GOOGLE_CLIENT_ID, LIVE_STREAM_URL } from '../consts';
-import { BrowserDocWriter, docId, loadGis } from '../api/gdoc';
+import { BrowserDocWriter, docId, docUrl, loadGis } from '../api/gdoc';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import {
-  dropLiveDoc, listenLive, liveConfig, liveResult, setLiveDoc, startLive, stopLive,
-  type DocMode, type LiveConfig, type LiveEvent, type LiveWord,
+  addListenerDoc, dropListenerDoc, listenLive, liveResult, startLive, stopLive,
+  type ListenerDoc, type LiveEvent, type LiveWord, type ServerDoc,
 } from '../api/live';
 import useObjectUrl from '../hooks/useObjectUrl';
 import { exportFileName, transcriptBlob } from '../review/exportTranscript';
@@ -28,13 +28,8 @@ type Source = 'broadcast' | 'link';
 
 type State = 'idle' | 'waiting' | 'live' | 'stopping' | 'ended';
 
-// the job's Google Doc, as the "doc" events tell every listener
-interface Doc {
-  url: string;
-  title?: string;
-  mode: DocMode;
-  by?: string;
-}
+// how often this page tells the API it still writes its doc
+const DOC_ALIVE_MS = 30_000;
 
 const STATE_LABELS: Record<State, string> = {
   idle: '',
@@ -117,13 +112,14 @@ export default function Live() {
   const [follow, setFollow] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [srt, setSrt] = useState<string | null>(null);
-  const [config, setConfig] = useState<LiveConfig | null>(null);
   const [docLink, setDocLink] = useState('');
-  const [doc, setDoc] = useState<Doc | null>(null);
+  const [serverDoc, setServerDoc] = useState<ServerDoc | null>(null);
+  const [listenerDocs, setListenerDocs] = useState<ListenerDoc[]>([]);
   const [docError, setDocError] = useState<string | null>(null);
   const [docBusy, setDocBusy] = useState(false);
-  // this page writing the doc as its user (mode "browser")
+  // this page writing a doc of its user's
   const writer = useRef<BrowserDocWriter | null>(null);
+  const [myDoc, setMyDoc] = useState<string | null>(null);
   const finalsRef = useRef<LiveWord[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -137,11 +133,19 @@ export default function Live() {
 
   finalsRef.current = finals;
 
-  // leaving the page stops listening (and this page's writing of the doc)
+  // leaving the page stops listening (and this page's writing of its doc)
   useEffect(() => () => {
     abort.current?.abort();
     void writer.current?.stop();
   }, []);
+
+  // while this page writes its doc, keep it on the list the other listeners see
+  useEffect(() => {
+    if (!myDoc || !jobId) return;
+    const title = writer.current?.title ?? '';
+    const timer = window.setInterval(() => void addListenerDoc(jobId, myDoc, title).catch(() => {}), DOC_ALIVE_MS);
+    return () => window.clearInterval(timer);
+  }, [myDoc, jobId]);
 
   // the consent popup must open right on the click: have Google's script ready before it
   useEffect(() => {
@@ -196,18 +200,9 @@ export default function Live() {
         setFinals((prev) => [...prev, ...e.words]);
         writer.current?.push(e.words.map((w) => w.word));
         break;
-      case 'doc':
-        if (e.error) {
-          setDocError(e.error);
-          break;
-        }
-        setDocError(null);
-        setDoc(e.url ? { url: e.url, title: e.title, mode: e.mode ?? 'server', by: e.by } : null);
-        // someone else took over the doc: this page stops writing it
-        if (writer.current && (!e.url || e.mode !== 'browser' || docId(e.url) !== writer.current.id)) {
-          void writer.current.stop();
-          writer.current = null;
-        }
+      case 'docs':
+        setServerDoc(e.server ?? null);
+        setListenerDocs(e.browser ?? []);
         break;
       case 'partial':
         setPartial(e.words);
@@ -220,8 +215,7 @@ export default function Live() {
       case 'end':
         setPartial([]);
         setState('ended');
-        void writer.current?.stop();
-        writer.current = null;
+        stopMyDoc(id);
         liveResult(id, 'srt').then(setSrt, (err) => setError(err instanceof Error ? err.message : String(err)));
         break;
       case 'error':
@@ -238,10 +232,10 @@ export default function Live() {
     abort.current?.abort();
     setError(null);
     setNote(null);
-    setDoc(null);
+    setServerDoc(null);
+    setListenerDocs([]);
     setDocError(null);
-    void writer.current?.stop();
-    writer.current = null;
+    if (jobId) stopMyDoc(jobId);
     setFinals([]);
     setPartial([]);
     setHeard(0);
@@ -257,7 +251,6 @@ export default function Live() {
       setMedia(m);
       const id = await startLive(m.audio);
       setJobId(id);
-      liveConfig().then(setConfig, () => setConfig(null));
       await listenLive(id, (ev) => onEvent(ev, id), controller.signal);
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -296,8 +289,9 @@ export default function Live() {
     if (el) setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
   }
 
-  async function attachDoc(mode: DocMode) {
-    if (!jobId) return;
+  // this page writes the text into a doc of its user's too, from now on (what is final so far first)
+  async function writeMyDoc() {
+    if (!jobId || !GOOGLE_CLIENT_ID) return;
     const id = docId(docLink);
     if (!id) {
       setDocError('קישור למסמך Google Docs: https://docs.google.com/document/d/...');
@@ -306,15 +300,13 @@ export default function Live() {
     setDocBusy(true);
     setDocError(null);
     try {
-      if (mode === 'browser') {
-        const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID!, id, setDocError);
-        // what is final so far first, then each new final event
-        w.push(finalsRef.current.map((f) => f.word));
-        void writer.current?.stop();
-        writer.current = w;
-      }
-      await setLiveDoc(jobId, docLink, mode);
+      const w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError);
+      w.push(finalsRef.current.map((f) => f.word));
+      stopMyDoc(jobId);
+      writer.current = w;
+      setMyDoc(docUrl(id));
       setDocLink('');
+      await addListenerDoc(jobId, docUrl(id), w.title);
     } catch (err) {
       setDocError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -322,15 +314,16 @@ export default function Live() {
     }
   }
 
-  async function detachDoc() {
-    if (!jobId) return;
-    void writer.current?.stop();
+  function stopMyDoc(id: string) {
+    const w = writer.current;
+    if (!w) return;
     writer.current = null;
-    await dropLiveDoc(jobId).catch((err) => setDocError(err instanceof Error ? err.message : String(err)));
+    setMyDoc(null);
+    void w.stop();
+    void dropListenerDoc(id, docUrl(w.id));
   }
 
-  const serverAccount = config?.google_service_account;
-  const canDoc = !!(serverAccount || GOOGLE_CLIENT_ID);
+  const showDocs = !!jobId && !!(serverDoc || listenerDocs.length || (GOOGLE_CLIENT_ID && busy));
 
   async function copyText() {
     await navigator.clipboard.writeText(finals.map((w) => w.word).join(' ')).catch(() => {});
@@ -445,49 +438,48 @@ export default function Live() {
           {srtUrl && <a className="btn" href={srtUrl} download={`${jobId}.srt`}>SRT</a>}
         </div>
 
-        {jobId && canDoc && (busy || doc) && (
+        {showDocs && (
           <div className="live__doc">
-            <div className="live__doc-title">Google Doc</div>
-            {doc ? (
-              <>
-                <a href={doc.url} target="_blank" rel="noreferrer" dir="auto">{doc.title || 'המסמך'}</a>
-                <span className="muted">
-                  {doc.mode === 'server' ? 'נכתב מהשרת' : `נכתב מהדפדפן${doc.by ? ` של ${doc.by}` : ''}`}
-                  {' · '}עריכות במסמך נשמרות עם שם העורך
-                </span>
-                {busy && <button type="button" className="btn" onClick={detachDoc}>הפסק לכתוב למסמך</button>}
-              </>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  className="input"
-                  dir="ltr"
-                  aria-label="קישור ל-Google Doc"
-                  placeholder="https://docs.google.com/document/d/..."
-                  value={docLink}
-                  onChange={(e) => setDocLink(e.target.value)}
-                  disabled={docBusy}
-                />
-                <div className="live__buttons">
-                  {serverAccount && (
-                    <button type="button" className="btn" onClick={() => attachDoc('server')}
-                      disabled={docBusy || !docLink.trim()}>כתוב מהשרת</button>
-                  )}
-                  {GOOGLE_CLIENT_ID && (
-                    <button type="button" className="btn" onClick={() => attachDoc('browser')}
-                      disabled={docBusy || !docLink.trim()}>כתוב מחשבון Google שלי</button>
-                  )}
+            <div className="live__doc-title">Google Docs</div>
+            {serverDoc && (
+              serverDoc.url ? (
+                <div className="live__doc-row">
+                  <a href={serverDoc.url} target="_blank" rel="noreferrer" dir="auto">{serverDoc.title || 'מסמך השידור'}</a>
+                  <span className="muted">מסמך השידור</span>
                 </div>
-                {serverAccount && (
-                  <span className="muted live__doc-hint">
-                    לכתיבה מהשרת שתפו את המסמך כעורך עם <span dir="ltr">{serverAccount}</span>
-                  </span>
-                )}
-                {GOOGLE_CLIENT_ID && (
-                  <span className="muted live__doc-hint">מחשבון שלכם: כותב רק כל עוד הדף פתוח</span>
-                )}
-              </>
+              ) : (
+                <span className="muted">מסמך השידור לא נוצר: <span dir="auto">{serverDoc.error}</span></span>
+              )
+            )}
+            {listenerDocs.map((d) => (
+              <div className="live__doc-row" key={d.url}>
+                <a href={d.url} target="_blank" rel="noreferrer" dir="auto">{d.title || 'מסמך'}</a>
+                <span className="muted" dir="auto">{d.url === myDoc ? 'שלי' : d.by}</span>
+              </div>
+            ))}
+            {GOOGLE_CLIENT_ID && busy && (
+              myDoc ? (
+                <button type="button" className="btn" onClick={() => jobId && stopMyDoc(jobId)}>
+                  הפסק לכתוב למסמך שלי
+                </button>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    className="input"
+                    dir="ltr"
+                    aria-label="קישור ל-Google Doc שלי"
+                    placeholder="https://docs.google.com/document/d/..."
+                    value={docLink}
+                    onChange={(e) => setDocLink(e.target.value)}
+                    disabled={docBusy}
+                  />
+                  <button type="button" className="btn" onClick={writeMyDoc} disabled={docBusy || !docLink.trim()}>
+                    כתוב גם למסמך שלי
+                  </button>
+                  <span className="muted live__doc-hint">מחשבון ה-Google שלכם, כל עוד הדף פתוח</span>
+                </>
+              )
             )}
             {docError && <div className="alert alert--error" role="alert" dir="auto">{docError}</div>}
           </div>
