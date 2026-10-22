@@ -6,4 +6,5 @@ interface ImportMetaEnv {
   readonly REACT_APP_ALIGN_URL: string;
   readonly REACT_APP_STT_URL?: string;
   readonly REACT_APP_LIVE_STREAM_URL?: string;
+  readonly REACT_APP_GOOGLE_CLIENT_ID?: string;
 }

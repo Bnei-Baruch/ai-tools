@@ -13,6 +13,9 @@ export const ALIGN_URL = import.meta.env.REACT_APP_ALIGN_URL;
 export const REVIEW_API = import.meta.env.REACT_APP_REVIEW_API;
 // Live transcription (תמלול חי): the broadcast's HLS stream
 export const LIVE_STREAM_URL = import.meta.env.REACT_APP_LIVE_STREAM_URL;
+// Live text into a Google Doc from the browser, as the user: an OAuth client id (Google Cloud, web app,
+// this origin allowed, Docs API on); empty = off
+export const GOOGLE_CLIENT_ID = import.meta.env.REACT_APP_GOOGLE_CLIENT_ID;
 // All reviewers share one set (the API routes still take a set id).
 export const REVIEW_SET = 'main';
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.

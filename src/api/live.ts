@@ -12,14 +12,48 @@ export interface LiveWord {
 }
 
 // start: audio is coming (start the player now); final: words that will not change; partial: the
-// current guess after them; reset: the worker restarted the stream, drop everything; end / error: over
+// current guess after them; reset: the worker restarted the stream, drop everything; end / error: over;
+// doc: the job's Google Doc was set (url null: dropped) or writing it failed (error)
 export interface LiveEvent {
-  type: 'start' | 'final' | 'partial' | 'reset' | 'end' | 'error';
+  type: 'start' | 'final' | 'partial' | 'reset' | 'end' | 'error' | 'doc';
   words: LiveWord[];
   message?: string;
   duration_s?: number;
   end_s?: number;
   decode_s?: number;
+  url?: string | null;
+  title?: string;
+  mode?: DocMode;
+  by?: string;
+  error?: string;
+}
+
+// who writes the doc: the server as its service account, or a listener's page as its user
+export type DocMode = 'server' | 'browser';
+
+export interface LiveConfig {
+  // set: the server can write Google Docs shared with this account
+  google_service_account: string | null;
+}
+
+export async function liveConfig(): Promise<LiveConfig> {
+  const res = await aiTrnsFetch('/live/config');
+  if (!res.ok) throw await errorFrom(res);
+  return res.json();
+}
+
+// Sets the job's doc; mode "server": the server checks it is shared with its account and writes it.
+export async function setLiveDoc(jobId: string, url: string, mode: DocMode): Promise<void> {
+  const form = new FormData();
+  form.set('url', url);
+  form.set('mode', mode);
+  const res = await aiTrnsFetch(`/live/${jobId}/doc`, { method: 'PUT', body: form });
+  if (!res.ok) throw await errorFrom(res);
+}
+
+export async function dropLiveDoc(jobId: string): Promise<void> {
+  const res = await aiTrnsFetch(`/live/${jobId}/doc`, { method: 'DELETE' });
+  if (!res.ok) throw await errorFrom(res);
 }
 
 interface Job {

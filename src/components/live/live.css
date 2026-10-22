@@ -40,6 +40,12 @@
   .lw--static { cursor: default; }
   .lw--static:hover { background: none; }
   .live__source { display: flex; gap: 20px; }
+  .live__doc {
+    display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .live__doc-title { font-weight: 600; }
+  .live__doc .input { width: 100%; }
+  .live__doc-hint { font-size: .8rem; word-break: break-all; }
   .lw--now { background: #fde68a; }
   .lw--partial { color: var(--muted); }
   .live__follow { position: absolute; bottom: 12px; inset-inline-start: 12px; padding: 4px 12px; }
