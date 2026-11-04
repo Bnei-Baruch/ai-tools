@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { tadiffCompare, tadiffCompareTimestamps } from '../api/stt';
+import { tadiffCompare, tadiffCompareTimestamps } from '../api/tools';
 import useApiCall from '../hooks/useApiCall';
 import FileField from '../components/form/FileField';
 import SubmitButton from '../components/form/SubmitButton';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import useElapsed from './useElapsed';
 
-// State of one stt-api request: run(call) passes call an upload progress callback;
+// State of one ai-trns request: run(call) passes call an upload progress callback;
 // returns the call's result, or undefined on error (then shown via error).
 export default function useApiCall() {
     const [state, setState] = useState({ loading: false, upload: 0, error: null });

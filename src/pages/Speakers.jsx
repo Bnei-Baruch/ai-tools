@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { diarizeSrt } from '../api/stt';
+import { diarizeSrt } from '../api/tools';
 import { jobResult } from '../api/aiTrns';
 import { saveBlob } from '../utils';
 import useApiCall from '../hooks/useApiCall';
