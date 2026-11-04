@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { MAX_UPLOAD_SIZE } from '../../api/stt';
+import { MAX_UPLOAD_SIZE } from '../../api/aiTrns';
 import { Button, Field, Message } from '../ui';
 
 const formatSize = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;

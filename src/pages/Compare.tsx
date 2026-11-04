@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
-import { transcribe, /* transcribeSttApi, */ type Chunk, type SttResult } from '../api/transcribe';
+import { transcribe, type Chunk, type SttResult } from '../api/transcribe';
 import { compare, suggestCorrection, wordAt, type Comparison } from '../compare/compare';
 import { isTranscriptFile, readTranscript } from '../compare/readTranscript';
 import { loadReviewLesson, type LessonFiles, type ReviewLesson } from '../compare/reviewLesson';
@@ -30,18 +30,15 @@ interface Media {
 // Where the model's transcript comes from -- all through ai-trns, picked by the link: a kabbalahmedia lesson
 // -> "review", its transcript in בדיקת תמלול (the set's, added there if missing), the only one the model's
 // mistakes can be marked on, into the same review; any other link -> an ai-trns job.
-// The choice between ai-trns and stt-api is switched off (commented out below); stt-api: transcribeSttApi.
-type Source = 'review' | 'ai-trns' /* | 'stt-api' */;
+type Source = 'review' | 'ai-trns';
 
 const SOURCE_LABELS: Record<Source, string> = {
   review: 'בדיקת תמלול',
   'ai-trns': 'ai-trns',
-  // 'stt-api': 'stt-api',
 };
 
 const TRANSCRIBE: Record<Exclude<Source, 'review'>, (url: string) => Promise<SttResult>> = {
   'ai-trns': transcribe,
-  // 'stt-api': transcribeSttApi,
 };
 
 interface Result {

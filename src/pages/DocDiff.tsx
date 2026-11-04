@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { docdiffCompare, MAX_UPLOAD_SIZE } from '../api/stt';
+import { docdiffCompare, MAX_UPLOAD_SIZE } from '../api/tools';
 import { formatElapsed, saveBlob } from '../utils';
 import useElapsed from '../hooks/useElapsed';
 import FileDrop from '../components/stt/FileDrop';

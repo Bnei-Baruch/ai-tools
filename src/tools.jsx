@@ -13,7 +13,7 @@ const Live = lazy(() => import('./pages/Live'));
 
 // To add a tool, add an entry here: it gets a route and a menu item.
 // A tool owns everything under its path (e.g. /review/...).
-// disabled: shown greyed out in the menu, no route. sttApi: needs stt-api (shows its health in the menu).
+// disabled: shown greyed out in the menu, no route. sttApi: needs ai-trns' diarize worker (shows its health in the menu).
 // keepAlive: once opened, stays mounted (hidden) while other tools are shown -- for pages that
 // hold a session (Keycloak init, running job) and can't be remounted.
 export const TOOLS = [
