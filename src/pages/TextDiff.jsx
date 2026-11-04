@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Container, Form, Header, Segment } from 'semantic-ui-react';
 import { tadiffCompare, tadiffCompareTimestamps } from '../api/stt';
 import useApiCall from '../hooks/useApiCall';
 import FileField from '../components/form/FileField';
 import SubmitButton from '../components/form/SubmitButton';
 import ErrorMessage from '../components/form/ErrorMessage';
 import DiffResult from '../components/textdiff/DiffResult';
+import { Card, Check, Field, Page, PageHeader, TextArea } from '../components/ui';
 
 const TextDiff = () => {
     const [mode, setMode] = useState('audio'); // 'audio' | 'timestamps'
@@ -17,7 +17,8 @@ const TextDiff = () => {
 
     const source = mode === 'audio' ? audio : timestamps;
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         setResult(null);
         const res = await call.run((onUploadProgress) => (mode === 'audio'
             ? tadiffCompare(audio, text, { onUploadProgress })
@@ -28,34 +29,38 @@ const TextDiff = () => {
     const { loading } = call;
 
     return (
-        <Container style={{ marginTop: 20 }}>
-            <Segment>
-                <Header as='h2' content='Text diff' subheader='Where the audio differs from the text' />
-                <Form onSubmit={handleSubmit}>
-                    <Form.Group inline>
-                        <Form.Radio label='Audio' checked={mode === 'audio'} disabled={loading}
-                                    onChange={() => setMode('audio')} />
-                        <Form.Radio label='Word timestamps (JSON)' checked={mode === 'timestamps'} disabled={loading}
-                                    onChange={() => setMode('timestamps')} />
-                    </Form.Group>
+        <Page>
+            <Card>
+                <PageHeader title='Text diff' subheader='Where the audio differs from the text' />
+                <form onSubmit={handleSubmit} className='flex flex-col gap-4'>
+                    <div className='flex gap-6'>
+                        <Check type='radio' name='textdiff-mode' label='Audio' checked={mode === 'audio'} disabled={loading}
+                               onChange={() => setMode('audio')} />
+                        <Check type='radio' name='textdiff-mode' label='Word timestamps (JSON)' checked={mode === 'timestamps'}
+                               disabled={loading} onChange={() => setMode('timestamps')} />
+                    </div>
                     {mode === 'audio'
                         ? <FileField label='Audio' accept='audio/*,video/*' file={audio} onChange={setAudio} disabled={loading} />
                         : <FileField label='Timestamps: [{"word", "start", "end"}, ...]' accept='.json,application/json'
                                      file={timestamps} onChange={setTimestamps} disabled={loading} />}
 
-                    <Form.TextArea label='Text' dir='auto' rows={8} value={text} disabled={loading}
-                                   onChange={(e, { value }) => setText(value)} />
+                    <Field label='Text' htmlFor='textdiff-text'>
+                        <TextArea id='textdiff-text' dir='auto' rows={8} value={text} disabled={loading}
+                                  onChange={(e) => setText(e.target.value)} />
+                    </Field>
                     <FileField accept='.txt,text/plain' file={null} disabled={loading} placeholder='Load text from .txt'
                                onChange={(file) => file && file.text().then(setText)} />
 
-                    <SubmitButton call={call} disabled={!source || !text.trim()}>Compare</SubmitButton>
-                </Form>
+                    <div>
+                        <SubmitButton call={call} disabled={!source || !text.trim()}>Compare</SubmitButton>
+                    </div>
+                </form>
 
                 <ErrorMessage call={call} />
 
                 {result && <DiffResult result={result} />}
-            </Segment>
-        </Container>
+            </Card>
+        </Page>
     );
 };
 

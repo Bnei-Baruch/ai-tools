@@ -27,18 +27,18 @@ jobs:
       # Keycloak settings fall back to the defaults in src/consts.js when unset.
       - run: yarn build
         env:
-          REACT_APP_MQTT_URL: ${{ vars.REACT_APP_MQTT_URL }}
-          REACT_APP_WEB_URL: ${{ vars.REACT_APP_WEB_URL }}
-          REACT_APP_AI_BACKEND: ${{ vars.REACT_APP_AI_BACKEND }}
-          REACT_APP_EXEC_API: ${{ vars.REACT_APP_EXEC_API }}
           REACT_APP_KEYCLOAK_URL: ${{ vars.REACT_APP_KEYCLOAK_URL }}
           REACT_APP_KEYCLOAK_REALM: ${{ vars.REACT_APP_KEYCLOAK_REALM }}
           REACT_APP_KEYCLOAK_CLIENT_ID: ${{ vars.REACT_APP_KEYCLOAK_CLIENT_ID }}
           REACT_APP_STT_API: ${{ vars.REACT_APP_STT_API }}
-          REACT_APP_STT_URL: ${{ vars.REACT_APP_STT_URL }}
+          REACT_APP_AI_TRNS_API: ${{ vars.REACT_APP_AI_TRNS_API }}
           REACT_APP_STT_MODEL: ${{ vars.REACT_APP_STT_MODEL }}
+          REACT_APP_STT_URL: ${{ vars.REACT_APP_STT_URL }}
           REACT_APP_ALIGN_URL: ${{ vars.REACT_APP_ALIGN_URL }}
           REACT_APP_REVIEW_API: ${{ vars.REACT_APP_REVIEW_API }}
+          REACT_APP_LIVE_STREAM_URL: ${{ vars.REACT_APP_LIVE_STREAM_URL }}
+          REACT_APP_GOOGLE_CLIENT_ID: ${{ vars.REACT_APP_GOOGLE_CLIENT_ID }}
+          REACT_APP_GOOGLE_API_KEY: ${{ vars.REACT_APP_GOOGLE_API_KEY }}
 
       - uses: actions/upload-artifact@v7
         with:

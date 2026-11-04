@@ -12,7 +12,7 @@ interface Props {
   onCancel: () => void;
 }
 
-// A lesson link from kabbalahmedia.info -> it joins the shared list; the page then transcribes it (useTranscriber).
+// A lesson link from kabbalahmedia.info -> it joins the shared list; the server transcribes it (an ai-trns job).
 export default function AddSegment({ set, reviewer, onAdded, onCancel }: Props) {
   const [link, setLink] = useState('');
   const [loading, setLoading] = useState(false);

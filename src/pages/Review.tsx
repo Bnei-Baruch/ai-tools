@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { REVIEW_SET } from '../consts';
 import { getUser, kc } from '../api/UserManager';
-import { deleteSegment, getAllResults, getReviewerResults, getSet, NotFoundError, REVIEW_LOCAL, type ReviewResult, type ReviewSegment, type ReviewSet } from '../api/review';
+import { addSegment, deleteSegment, getAllResults, getReviewerResults, getSet, NotFoundError, REVIEW_LOCAL, type ReviewResult, type ReviewSegment, type ReviewSet } from '../api/review';
 import { readDraft, resendDraft } from '../review/useReviewSaver';
-import useTranscriber from '../review/useTranscriber';
 import ErrorAlert from '../components/stt/ErrorAlert';
 import AddSegment from '../components/review/AddSegment';
 import Instructions from '../components/review/Instructions';
@@ -14,7 +13,7 @@ import SegmentReview, { type Reviewer } from '../components/review/SegmentReview
 import '../components/review/review.css';
 
 const INTRO_SEEN_KEY = 'review-intro-seen';
-// how often the list re-reads the set while a new segment is being transcribed
+// how often the list re-reads the set while a new segment is being transcribed (by an ai-trns job)
 const PENDING_POLL_MS = 10_000;
 
 const storage = {
@@ -88,8 +87,6 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
   const replaceSegment = useCallback((segment: ReviewSegment) => setSet((prev) => prev && {
     ...prev, segments: [...prev.segments.filter((s) => s.id !== segment.id), segment],
   }), []);
-  const reloadSet = useCallback(() => getSet(setId).then(setSet, () => {}), [setId]);
-  const transcriber = useTranscriber(setId, reviewer.id, replaceSegment, reloadSet);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +163,24 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
     }
   }
 
+  // A failed lesson is added again: the server replaces it and queues a new job.
+  async function retry(segment: ReviewSegment) {
+    const fileId = (url: string) => url.split('/').pop() ?? '';
+    try {
+      replaceSegment(await addSegment(setId, {
+        unit_uid: segment.unit_uid ?? segment.id,
+        title: segment.title,
+        audio_file_id: fileId(segment.media_url),
+        video_file_id: segment.video_url && fileId(segment.video_url),
+        duration: segment.end - segment.start,
+        reviewer: reviewer.id,
+        reviewer_name: reviewer.name,
+      }));
+    } catch (e) {
+      window.alert(`התמלול לא הופעל: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (error) return <div className="card"><ErrorAlert error={error} /></div>;
   if (set === null) return <div className="card"><div className="progress" /></div>;
 
@@ -186,8 +201,7 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
               onOpen={open}
               onAdd={() => navigate(`${base}/new`)}
               onDelete={remove}
-              transcribing={transcriber.running}
-              onTranscribe={(segment) => transcriber.run(segment, set.model)}
+              onRetry={retry}
               onHelp={() => setHelp(true)}
             />
           )}
@@ -200,7 +214,6 @@ function ReviewerScreens({ setId, reviewer }: { setId: string; reviewer: Reviewe
               reviewer={reviewer}
               onAdded={(segment) => {
                 replaceSegment(segment);
-                void transcriber.run(segment, set.model);
                 navigate(base);
               }}
               onCancel={() => navigate(base)}

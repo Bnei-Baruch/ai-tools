@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   envPrefix: 'REACT_APP_',
   server: {
     port: 3000,
@@ -10,7 +11,5 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: true,
-    // lightningcss rejects an invalid selector in semantic-ui-css
-    cssMinify: 'esbuild',
   },
 });

@@ -1,13 +1,15 @@
 import React from 'react';
-import { Header, Table } from 'semantic-ui-react';
 import { formatTimestamp } from '../../api/transcribe';
 import Stats from '../form/Stats';
+import { cx } from '../ui';
 
 const KINDS = {
-    removed: { title: 'Not heard', row: { negative: true } },
-    added: { title: 'Extra in audio', row: { positive: true } },
-    changed: { title: 'Changed', row: { warning: true } },
+    removed: { title: 'Not heard', row: 'bg-red-50 text-red-900' },
+    added: { title: 'Extra in audio', row: 'bg-green-50 text-green-900' },
+    changed: { title: 'Changed', row: 'bg-amber-50 text-amber-900' },
 };
+
+const CELL = 'border border-slate-200 px-3 py-1.5';
 
 // One list of differences in audio order; removed ones sit where the text was skipped.
 const diffRows = ({ removed, added, changed }) => [
@@ -31,27 +33,27 @@ const DiffResult = ({ result }) => {
                 ['audio_words', 'Audio words'],
                 ...Object.entries(KINDS).map(([kind, { title }]) => [kind, title]),
             ]} />
-            {rows.length === 0 ? <Header as='h4' content='No differences' /> : (
-                <Table compact celled>
-                    <Table.Header>
-                        <Table.Row>
-                            <Table.HeaderCell collapsing>Time</Table.HeaderCell>
-                            <Table.HeaderCell collapsing />
-                            <Table.HeaderCell>Text</Table.HeaderCell>
-                            <Table.HeaderCell>Heard</Table.HeaderCell>
-                        </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
+            {rows.length === 0 ? <h4 className='mt-4 font-semibold'>No differences</h4> : (
+                <table className='mt-4 w-full border-collapse text-sm'>
+                    <thead className='bg-slate-50 text-left'>
+                        <tr>
+                            <th className={cx(CELL, 'w-px whitespace-nowrap')}>Time</th>
+                            <th className={cx(CELL, 'w-px')} />
+                            <th className={CELL}>Text</th>
+                            <th className={CELL}>Heard</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         {rows.map((r, i) => (
-                            <Table.Row key={i} {...KINDS[r.kind].row}>
-                                <Table.Cell collapsing>{formatTimestamp(r.time)}</Table.Cell>
-                                <Table.Cell collapsing>{KINDS[r.kind].title}</Table.Cell>
-                                <Table.Cell dir='auto'>{r.text}</Table.Cell>
-                                <Table.Cell dir='auto'>{r.heard}</Table.Cell>
-                            </Table.Row>
+                            <tr key={i} className={KINDS[r.kind].row}>
+                                <td className={cx(CELL, 'whitespace-nowrap tabular-nums')}>{formatTimestamp(r.time)}</td>
+                                <td className={cx(CELL, 'whitespace-nowrap')}>{KINDS[r.kind].title}</td>
+                                <td className={CELL} dir='auto'>{r.text}</td>
+                                <td className={CELL} dir='auto'>{r.heard}</td>
+                            </tr>
                         ))}
-                    </Table.Body>
-                </Table>
+                    </tbody>
+                </table>
             )}
         </>
     );

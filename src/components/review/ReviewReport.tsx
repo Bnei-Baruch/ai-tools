@@ -26,7 +26,7 @@ function SummaryRow({ label, s }: { label: string; s: Summary }) {
   );
 }
 
-// Admin report, by link, no login: /review/{set_id}/results
+// Admin report, by link (login required by the API): /review/{set_id}/results
 export default function ReviewReport() {
   const { setId = '' } = useParams();
   const [data, setData] = useState<AllResults | null>(null);

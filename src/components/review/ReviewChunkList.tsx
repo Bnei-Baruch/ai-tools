@@ -33,7 +33,7 @@ interface Props {
 // Buttons shouldn't take focus: Space must keep toggling the player, not re-click the button.
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 
-function Words({ ops, side }: { ops: DiffOp[]; side: 'ins' | 'del' }) {
+export function Words({ ops, side }: { ops: DiffOp[]; side: 'ins' | 'del' }) {
   const shown = ops.filter((o) => o.op === 'same' || o.op === side);
   if (!shown.length) return <span className="rchunk__empty">(נמחק)</span>;
   return (

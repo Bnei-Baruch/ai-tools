@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, Form, Header } from 'semantic-ui-react';
 import FileField from '../form/FileField';
+import { Button, Input, SectionHeader } from '../ui';
 
 const AUDIO_ACCEPT = 'audio/*,video/*';
 
@@ -13,16 +13,16 @@ const VoiceSamples = ({ samples, onChange, disabled }) => {
 
     return (
         <>
-            <Header as='h4' content='Voice samples (optional)'
-                    subheader='Known speakers: a short clip of each voice with the name to label it with' />
+            <SectionHeader title='Voice samples (optional)'
+                           subheader='Known speakers: a short clip of each voice with the name to label it with' />
             {samples.map((s, i) => (
-                <Form.Group key={i} inline>
+                <div key={i} className='mb-2 flex items-center gap-2'>
                     <FileField accept={AUDIO_ACCEPT} file={s.file} disabled={disabled}
                                onChange={(file) => (file ? update(i, { file }) : remove(i))} />
-                    <Form.Input placeholder={baseName(s.file)} value={s.name} disabled={disabled}
-                                onChange={(e, { value }) => update(i, { name: value })} />
-                    <Button type='button' basic icon='trash' disabled={disabled} onClick={() => remove(i)} />
-                </Form.Group>
+                    <Input className='max-w-xs' placeholder={baseName(s.file)} value={s.name} disabled={disabled}
+                           onChange={(e) => update(i, { name: e.target.value })} />
+                    <Button aria-label='Remove sample' disabled={disabled} onClick={() => remove(i)}>🗑</Button>
+                </div>
             ))}
             <FileField accept={AUDIO_ACCEPT} file={null} disabled={disabled} placeholder='Add sample'
                        onChange={(file) => file && onChange([...samples, { file, name: '' }])} />

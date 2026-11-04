@@ -1,34 +1,18 @@
 import React from 'react';
-import { Button } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import { isToolEnabled } from '../../tools';
+import { Button } from '../ui';
 
-// audioFile: the uploaded File (null for a link), handed over to the Speakers tool with output.srt
-const TranscriptionResults = ({ onDownload, audioFile }) => (
-    <div style={{marginTop: 20}}>
-        <Button
-            color="gray"
-            icon="download"
-            content="Download output.txt"
-            onClick={() => onDownload('output.txt')}
-            style={{marginRight: 10}}
-        />
-        <Button
-            color="gray"
-            icon="download"
-            content="Download output.srt"
-            onClick={() => onDownload('output.srt')}
-            style={{marginRight: 10}}
-        />
+// formats: what the job was asked for; jobId with the uploaded audioFile or the url go to the Speakers tool
+const TranscriptionResults = ({ formats, onDownload, jobId, audioFile, url }) => (
+    <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+        {formats.map((f) => (
+            <Button key={f} variant="gray" onClick={() => onDownload(f)}>⬇ Download {f}</Button>
+        ))}
         {isToolEnabled('speakers') && (
-            <Button
-                color="teal"
-                icon="users"
-                content="Add speakers"
-                as={Link}
-                to="/speakers"
-                state={{execSrt: 'output.srt', audio: audioFile}}
-            />
+            <Button variant="teal" as={Link} to="/speakers" state={{ jobId, audio: audioFile, url }}>
+                👥 Add speakers
+            </Button>
         )}
     </div>
 );
