@@ -95,3 +95,8 @@ test('suggestCorrection: words the model missed are inserted where they belong',
   const end = compare('אחד שתיים', [{ start: 0, end: 2, text: 'אחד' }]);
   assert.deepEqual(suggestCorrection(end, 0), { chunk: 0, text: 'אחד שתיים' });
 });
+
+test('a paragraph of the speakers view keeps its own word times', () => {
+  const words = modelWords([{ start: 1, end: 9, text: 'שלום חברים', speaker: 'רב', times: [1, 4.5] }]);
+  assert.deepEqual(words.map((w) => w.time), [1, 4.5]);
+});

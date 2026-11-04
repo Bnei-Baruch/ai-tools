@@ -66,3 +66,10 @@
     .compare-col__text { max-height: 50vh; }
   }
 }
+
+/* speakers view: the label before each paragraph */
+.compare-group__speaker { font-weight: 700; }
+.compare-group__speaker--rav { color: #1d4ed8; }
+.compare-group__speaker--reader { color: #047857; }
+.compare-group__speaker--student { color: #9333ea; }
+.compare__speakers { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }

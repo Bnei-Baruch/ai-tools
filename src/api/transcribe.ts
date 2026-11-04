@@ -4,6 +4,9 @@ export interface Chunk {
   start: number;
   end: number;
   text: string;
+  // a paragraph of the speakers view (api/speakers.ts): its speaker label, the time of each word of text
+  speaker?: string | null;
+  times?: number[];
 }
 
 export interface SttResult {
@@ -83,6 +86,19 @@ export function parseSrt(srt: string): Chunk[] {
     if (text) chunks.push({ start, end, text });
   }
   return chunks;
+}
+
+// "HH:MM:SS,mmm" for SRT
+function srtTime(s: number): string {
+  const ms = Math.round(s * 1000);
+  const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+  const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+  const sec = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+  return `${h}:${m}:${sec},${String(ms % 1000).padStart(3, '0')}`;
+}
+
+export function chunksToSrt(chunks: Chunk[]): string {
+  return chunks.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n');
 }
 
 // "HH:MM:SS.mmm" timestamp for WebVTT cues

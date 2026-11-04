@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import { transcribe, type Chunk, type SttResult } from '../api/transcribe';
+import { speakerParagraphs } from '../api/speakers';
 import { compare, suggestCorrection, wordAt, type Comparison } from '../compare/compare';
 import { isTranscriptFile, readTranscript } from '../compare/readTranscript';
 import { loadReviewLesson, type LessonFiles, type ReviewLesson } from '../compare/reviewLesson';
@@ -47,6 +48,34 @@ interface Result {
   comparison: Comparison;
   // source "review": the lesson in the set, its transcript is the model's chunks
   lesson: ReviewLesson | null;
+  // what was compared: the person's text and the model's chunks (the speakers view compares them again)
+  text: string;
+  chunks: Chunk[];
+}
+
+// The speakers view: the model's text in paragraphs with רב / קריין / תלמיד (an ai-trns diarize job)
+type SpeakersState =
+  | { status: 'off' | 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'done'; chunks: Chunk[] };
+
+const SPEAKERS_CACHE_KEY = 'compare-speakers';
+
+function cachedParagraphs(audio: string, chunks: Chunk[]): Chunk[] | null {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SPEAKERS_CACHE_KEY) ?? 'null');
+    return cached?.audio === audio && cached.words === chunks.length ? cached.paragraphs : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheParagraphs(audio: string, chunks: Chunk[], paragraphs: Chunk[]) {
+  try {
+    localStorage.setItem(SPEAKERS_CACHE_KEY, JSON.stringify({ audio, words: chunks.length, paragraphs }));
+  } catch {
+    // full or blocked: asked again next time
+  }
 }
 
 // a difference plays from a moment before it
@@ -158,7 +187,7 @@ export default function Compare() {
         chunks = cached ?? (await TRANSCRIBE[source](media.audio)).chunks;
         if (!cached) cacheChunks(media.audio, source, chunks);
       }
-      setResult({ media, source, lesson, comparison: compare(text, chunks) });
+      setResult({ media, source, lesson, comparison: compare(text, chunks), text, chunks });
       setRuns((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -258,7 +287,17 @@ export default function Compare() {
 }
 
 function CompareResult({ result }: { result: Result }) {
-  const { comparison, lesson } = result;
+  const [speakers, setSpeakers] = useState<SpeakersState>({ status: 'off' });
+  const [speakersView, setSpeakersView] = useState(false);
+  const speakersElapsed = useElapsed(speakers.status === 'loading');
+  const paragraphs = speakers.status === 'done' ? speakers.chunks : null;
+  const speakersComparison = useMemo(
+    () => (paragraphs ? compare(result.text, paragraphs) : null),
+    [paragraphs, result.text],
+  );
+  const showSpeakers = speakersView && speakersComparison !== null;
+  const comparison = showSpeakers ? speakersComparison : result.comparison;
+  const lesson = result.lesson;
   const hunks = comparison.hunks;
   const [currentTime, setCurrentTime] = useState(0);
   const [selected, setSelected] = useState(-1);
@@ -321,7 +360,9 @@ function CompareResult({ result }: { result: Result }) {
     if (s) openEditor(s.chunk, s.text);
   }
 
-  const columnMarks: ColumnMarks | undefined = marks.enabled ? {
+  // marks belong to the model's chunks (בדיקת תמלול): only in the chunks view
+  const marking = marks.enabled && !showSpeakers;
+  const columnMarks: ColumnMarks | undefined = marking ? {
     state: (g) => {
       const e = marks.edits[g];
       if (!e || e.corrected === chunks[g]?.text) return null;
@@ -350,6 +391,24 @@ function CompareResult({ result }: { result: Result }) {
       );
     },
   } : undefined;
+
+  async function toggleSpeakers(on: boolean) {
+    setSpeakersView(on);
+    setSelected(-1);
+    setEditing(null);
+    if (!on || speakers.status === 'loading' || speakers.status === 'done') return;
+    const cached = cachedParagraphs(result.media.audio, result.chunks);
+    if (cached) return setSpeakers({ status: 'done', chunks: cached });
+    setSpeakers({ status: 'loading' });
+    try {
+      const chunks = await speakerParagraphs(result.media.audio, result.chunks);
+      cacheParagraphs(result.media.audio, result.chunks, chunks);
+      setSpeakers({ status: 'done', chunks });
+    } catch (err) {
+      setSpeakers({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+      setSpeakersView(false);
+    }
+  }
 
   const activeHuman = useMemo(() => wordAt(comparison.human, currentTime), [comparison, currentTime]);
   const activeModel = useMemo(() => wordAt(comparison.model, currentTime), [comparison, currentTime]);
@@ -399,7 +458,7 @@ function CompareResult({ result }: { result: Result }) {
             >
               הבא ←
             </button>
-            {marks.enabled && hunk && (
+            {marking && hunk && (
               <button type="button" className="btn btn--ghost" onClick={markHunk} title="תיקון השורה של המודל לפי הטקסט שלכם">
                 ✎ טעות של המודל
               </button>
@@ -409,6 +468,21 @@ function CompareResult({ result }: { result: Result }) {
             <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
             הטקסט עוקב אחרי השמע
           </label>
+          <div className="compare__speakers">
+            <label className="compare__follow">
+              <input
+                type="checkbox"
+                checked={speakersView}
+                onChange={(e) => void toggleSpeakers(e.target.checked)}
+              />
+              הצג דוברים ופסקאות
+            </label>
+            {speakers.status === 'loading' && (
+              <span className="badge badge--run">מזהה דוברים… {formatElapsed(speakersElapsed)}</span>
+            )}
+            {speakers.status === 'error' && <span className="compare__missing">{speakers.error}</span>}
+            {showSpeakers && result.lesson && <span className="muted">סימון טעויות — בתצוגה הרגילה</span>}
+          </div>
           <p className="muted compare__legend">
             <span className="cw cw--diff compare-col--human">אצלכם</span> / <span className="cw cw--diff compare-col--model">במודל</span>{' '}
             — מילים שונות · <span className="cw-gap">⁁</span> — חסרות מילים
@@ -447,7 +521,7 @@ function CompareResult({ result }: { result: Result }) {
           onHunk={selectHunk}
         />
         <TextColumn
-          title={`תמלול אוטומטי · ${SOURCE_LABELS[result.source]}`}
+          title={`תמלול אוטומטי · ${SOURCE_LABELS[result.source]}${showSpeakers ? ' · דוברים' : ''}`}
           side="model"
           words={comparison.model}
           hunks={hunks}
@@ -457,6 +531,7 @@ function CompareResult({ result }: { result: Result }) {
           onSeek={seek}
           onHunk={selectHunk}
           marks={columnMarks}
+          labels={showSpeakers ? paragraphs!.map((c) => c.speaker) : undefined}
         />
       </div>
     </section>
