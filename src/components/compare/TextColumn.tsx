@@ -4,6 +4,9 @@ import type { Hunk, Word } from '../../compare/compare';
 
 type Side = 'human' | 'model';
 
+// speaker label -> CSS modifier (labels come from ai-trns labels.py)
+const SPEAKER_CLASS: Record<string, string> = { 'רב': 'rav', 'קריין': 'reader', 'תלמיד': 'student' };
+
 export type MarkState = 'marked' | 'incomplete' | null;
 
 // Marking the model's chunks (groups) as on the review page; the group number is the chunk index.
@@ -28,6 +31,8 @@ interface Props {
   onSeek: (time: number) => void;
   onHunk: (hunk: number) => void;
   marks?: ColumnMarks;
+  // speaker label of each group (the speakers view), shown before its text
+  labels?: (string | null | undefined)[];
 }
 
 interface Group {
@@ -40,7 +45,7 @@ interface Group {
 
 // One side of the comparison: paragraphs / chunks, the words that differ highlighted, a marker
 // where the other side has words this one lacks.
-export default function TextColumn({ title, side, words, hunks, activeWord, selected, follow, onSeek, onHunk, marks }: Props) {
+export default function TextColumn({ title, side, words, hunks, activeWord, selected, follow, onSeek, onHunk, marks, labels }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // word index -> hunks whose words are missing on this side right before it
@@ -111,6 +116,7 @@ export default function TextColumn({ title, side, words, hunks, activeWord, sele
               selected={selected >= g.first && selected <= g.last ? selected : -1}
               markable={!!marks}
               mark={marks?.state(words[g.from].group) ?? null}
+              label={labels?.[words[g.from].group] ?? null}
             />
             {marks?.render(words[g.from].group)}
           </div>
@@ -132,10 +138,11 @@ interface GroupProps {
   // the group can be marked (the model's side, against בדיקת תמלול), and its mark
   markable: boolean;
   mark: MarkState;
+  label: string | null;
 }
 
 // Memoized: on each timeupdate only the groups with the active word (before and after) re-render.
-const GroupText = memo(function GroupText({ words, from, to, gaps, last, active, selected, markable, mark }: GroupProps) {
+const GroupText = memo(function GroupText({ words, from, to, gaps, last, active, selected, markable, mark, label }: GroupProps) {
   const gap = (at: number) =>
     gaps.get(at)?.map((hunk) => (
       <span key={`g${hunk}`} data-gap={hunk} className={hunk === selected ? 'cw-gap cw--selected' : 'cw-gap'} title="חסר כאן">
@@ -156,7 +163,10 @@ const GroupText = memo(function GroupText({ words, from, to, gaps, last, active,
   return (
     <p className={mark ? `compare-group compare-group--${mark}` : 'compare-group'}>
       <span className="chunk__ts" data-ts={from}>{formatTimestamp(words[from].time)}</span>
-      <span dir="auto" className="compare-group__text">{items}</span>
+      <span dir="auto" className="compare-group__text">
+        {label && <strong className={`compare-group__speaker compare-group__speaker--${SPEAKER_CLASS[label] ?? 'other'}`}>{label}: </strong>}
+        {items}
+      </span>
       {markable && (
         <button type="button" className="icon-btn compare-group__mark" data-mark={words[from].group} title="סימון טעות בשורה">✎</button>
       )}

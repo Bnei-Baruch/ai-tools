@@ -53,10 +53,13 @@ export function humanWords(text: string): Word[] {
     .flatMap((p, group) => p.map((text) => ({ text, group, time: 0, hunk: -1 })));
 }
 
-// Each chunk's words get times spread over the chunk by their length.
+// Each chunk's words get times spread over the chunk by their length, or their own (c.times, a paragraph).
 export function modelWords(chunks: Chunk[]): Word[] {
   return chunks.flatMap((c, group) => {
     const parts = c.text.split(/\s+/).filter(Boolean);
+    if (c.times && c.times.length === parts.length) {
+      return parts.map((text, i) => ({ text, group, time: c.times![i], hunk: -1 }));
+    }
     const total = parts.reduce((n, p) => n + p.length + 1, 0);
     let before = 0;
     return parts.map((text) => {

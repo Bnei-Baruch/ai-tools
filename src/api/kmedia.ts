@@ -17,10 +17,13 @@ export interface KmediaFile {
 export interface ContentUnit {
   id: string;
   name: string;
+  content_type?: string;
   film_date?: string;
   duration?: number;
   original_language?: string;
   files: KmediaFile[];
+  // e.g. the lesson's LIKUTIM: the sources read in it
+  derived_units?: Record<string, ContentUnit>;
 }
 
 // "https://kabbalahmedia.info/he/lessons/cu/5JBUHZoo?c=...", ".../cu/5JBUHZoo" or just "5JBUHZoo" -> "5JBUHZoo"
@@ -62,4 +65,16 @@ export function pickFiles(unit: ContentUnit): { audio?: KmediaFile; video?: Kmed
     .filter((f) => f.type === 'video' && f.mimetype === 'video/mp4')
     .sort((a, b) => VIDEO_SIZES.indexOf(a.video_size ?? '') - VIDEO_SIZES.indexOf(b.video_size ?? ''))[0];
   return { audio, video };
+}
+
+// The lesson's sources as read in it (its LIKUTIM unit's Hebrew .docx), to tell the reader from the students;
+// null if it has none.
+export async function fetchLessonSource(uid: string): Promise<File | null> {
+  const unit = await fetchUnit(uid);
+  const likutim = Object.values(unit.derived_units ?? {}).find((u) => u.content_type === 'LIKUTIM');
+  const doc = likutim?.files.find((f) => f.language === 'he' && f.type === 'text' && /\.docx$/i.test(f.name));
+  if (!doc) return null;
+  const res = await fetch(fileUrl(doc));
+  if (!res.ok) return null;
+  return new File([await res.blob()], 'source.docx');
 }
