@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
+import { fetchLessonSource, fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import { transcribe, type Chunk, type SttResult } from '../api/transcribe';
 import { speakerParagraphs } from '../api/speakers';
 import { compare, suggestCorrection, wordAt, type Comparison } from '../compare/compare';
@@ -401,7 +401,9 @@ function CompareResult({ result }: { result: Result }) {
     if (cached) return setSpeakers({ status: 'done', chunks: cached });
     setSpeakers({ status: 'loading' });
     try {
-      const chunks = await speakerParagraphs(result.media.audio, result.chunks);
+      const uid = result.media.lesson?.uid;
+      const source = uid ? await fetchLessonSource(uid).catch(() => null) : null;
+      const chunks = await speakerParagraphs(result.media.audio, result.chunks, source);
       cacheParagraphs(result.media.audio, result.chunks, chunks);
       setSpeakers({ status: 'done', chunks });
     } catch (err) {

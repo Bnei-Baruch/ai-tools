@@ -14,9 +14,11 @@ interface Paragraph {
 
 // The model's transcript of the audio at `url` (its chunks) -> paragraphs with speakers, as chunks
 // (speaker label, a time per word). A diarize job with paragraphs; takes a few minutes.
-export async function speakerParagraphs(url: string, chunks: Chunk[], onJob?: (job: Job) => void): Promise<Chunk[]> {
+// source: the lesson's source text (.docx / .txt) -- turns reading it are the reader's (קריין).
+export async function speakerParagraphs(url: string, chunks: Chunk[], source?: File | null,
+                                        onJob?: (job: Job) => void): Promise<Chunk[]> {
   const srt = new File([chunksToSrt(chunks)], 'transcript.srt', { type: 'application/x-subrip' });
-  const job = await waitJob(await postJob('/diarize/words', formOf({ url, srt, paragraphs: 'true' })), onJob);
+  const job = await waitJob(await postJob('/diarize/words', formOf({ url, srt, source, paragraphs: 'true' })), onJob);
   const { paragraphs } = (await (await jobResult(job.id, 'paragraphs')).json()) as { paragraphs: Paragraph[] };
   return paragraphs
     .map((p) => {
