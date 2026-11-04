@@ -27,10 +27,6 @@ jobs:
       # Keycloak settings fall back to the defaults in src/consts.js when unset.
       - run: yarn build
         env:
-          REACT_APP_MQTT_URL: ${{ vars.REACT_APP_MQTT_URL }}
-          REACT_APP_WEB_URL: ${{ vars.REACT_APP_WEB_URL }}
-          REACT_APP_AI_BACKEND: ${{ vars.REACT_APP_AI_BACKEND }}
-          REACT_APP_EXEC_API: ${{ vars.REACT_APP_EXEC_API }}
           REACT_APP_KEYCLOAK_URL: ${{ vars.REACT_APP_KEYCLOAK_URL }}
           REACT_APP_KEYCLOAK_REALM: ${{ vars.REACT_APP_KEYCLOAK_REALM }}
           REACT_APP_KEYCLOAK_CLIENT_ID: ${{ vars.REACT_APP_KEYCLOAK_CLIENT_ID }}

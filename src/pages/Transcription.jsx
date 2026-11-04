@@ -1,240 +1,139 @@
-import React, { Component, Fragment } from 'react';
+import React, { Fragment, useState } from 'react';
 import LoginPage from '../components/LoginPage';
 import MediaSource from '../components/transcription/MediaSource';
 import TranscriptionResults from '../components/transcription/TranscriptionResults';
 import TranscriptionSettings from '../components/transcription/TranscriptionSettings';
-import mqtt from "../api/mqtt";
-import {getConfig, updateServiceArgs, parseArgsFromConfig, createArgsArray, fetchExecFile} from "../api/exec";
-import {saveBlob} from "../utils";
-import { Button, Card } from '../components/ui';
+import { formOf, jobResult, postJob, waitJob } from '../api/aiTrns';
+import { saveBlob } from '../utils';
+import { Button, Card, Message } from '../components/ui';
 
-class Transcription extends Component {
+const STAGES = {
+    queued: 'Waiting in the queue',
+    downloading: 'Fetching the media',
+    converting: 'Converting the audio',
+    loading_model: 'Loading the model',
+    queued_upstream: 'Waiting for the transcription service',
+};
 
-    state = {
-        pass: false,
-        user: null,
-        percent: 0,
-        progress: 0,
-        serviceAlive: false,
-        logText: '',
-        reportInterval: null,
-        inputFile: '',
-        audioFile: null, // uploaded File, handed over to the Speakers tool
-        outputFormats: ['srt'], // array of selected formats
-        language: 'he', // default to Hebrew
-        configLoading: false,
-        stButton: false,
-    };
-
-    componentDidMount() {
-        //this.loadConfigFields()
+// The status line for a job state
+const statusText = (job) => {
+    if (job.status === 'queued') {
+        return job.queue_position ? `${STAGES.queued} (#${job.queue_position})...` : `${STAGES.queued}...`;
     }
+    return `${STAGES[job.stage] || 'Transcription in progress'}...`;
+};
 
-    checkPermission = (user) => {
-        this.setState({user});
-        this.initMQTT(user);
+// "lesson.mp4" -> "lesson"; a link -> its last path segment
+const baseName = (file, link) => {
+    const name = file ? file.name : decodeURIComponent(new URL(link).pathname.split('/').filter(Boolean).pop() || 'output');
+    return name.replace(/\.[^.]+$/, '') || 'output';
+};
+
+// An ai-trns transcription job (POST /jobs) for an uploaded file or a link; the results are the job's formats.
+const Transcription = () => {
+    const [user, setUser] = useState(null);
+    const [file, setFile] = useState(null);
+    const [link, setLink] = useState('');
+    const [language, setLanguage] = useState('he');
+    const [outputFormats, setOutputFormats] = useState(['srt']);
+    const [busy, setBusy] = useState(false);
+    const [percent, setPercent] = useState(0);
+    const [logText, setLogText] = useState('');
+    const [error, setError] = useState(null);
+    // the finished job: {id, formats, name, file, url}
+    const [done, setDone] = useState(null);
+
+    const url = link.trim();
+    const canStart = !busy && (file || url) && outputFormats.length > 0;
+
+    const chooseFile = (f) => {
+        setFile(f);
+        setLink('');
     };
 
-    progress = (step, file) => {
-        let count = Math.round(step.percent);
-        //console.log('onProgress', step, file.name);
-        this.setState({percent: count});
+    const typeLink = (value) => {
+        setLink(value);
+        setFile(null);
     };
 
-    uploadStart = (file) => {
-        console.log("uploading...");
-        this.setState({logText: "Uploading...", audioFile: file})
-    }
-
-    uploadDone = (file_data) => {
-        console.log(":: UploadApp - got data: ", file_data);
-        // Set uploaded file name to input field
-        const uploadedFileName = `tmp/${file_data.file_name}`;
-        this.setState({
-            inputFile: uploadedFileName,
-            logText: "",
-            percent: 0
-        }, () => {
-            this.saveConfiguration();
-        });
-    };
-
-    initMQTT = (user) => {
-        mqtt.init(user, (data) => {
-            console.log("[mqtt] init: ", data, user);
-            mqtt.join("exec/status/ai-trns")
-            mqtt.join("exec/service/ai-trns/#")
-            mqtt.join("exec/state/ai-trns")
-            mqtt.join("exec/service/data/#")
-            this.sendStatus();
-            mqtt.watch((message) => {
-                this.handleMessage(message);
+    const start = async () => {
+        setBusy(true);
+        setError(null);
+        setDone(null);
+        setPercent(0);
+        const formats = [...outputFormats];
+        try {
+            const body = formOf({
+                file, url: file ? '' : url, lang: language, format: formats.join(','),
+                // RTL marks in Hebrew subtitles, as the old exec-api page did
+                fix_rtl: language === 'he' ? 'true' : '',
             });
-        });
+            setLogText(file ? 'Uploading...' : 'Starting...');
+            let job = await postJob('/jobs', body, file ? (p) => {
+                setPercent(p);
+                setLogText(p < 100 ? 'Uploading...' : 'Starting...');
+            } : undefined);
+            setPercent(0);
+            job = await waitJob(job, (j) => {
+                setLogText(statusText(j));
+                setPercent(Math.round((j.progress || 0) * 100));
+            });
+            setDone({ id: job.id, formats, name: baseName(file, url), file, url: file ? null : url });
+            setLogText('Your files are ready!');
+        } catch (err) {
+            setError(err.message);
+            setLogText('');
+        } finally {
+            setBusy(false);
+            setPercent(0);
+        }
     };
 
-    handleMessage = (message) => {
-        if (message?.action === "status") {
-            const {alive, runtime, name} = message.data || {};
-            console.log(`[status] ${name} is ${alive ? "alive" : "stopped"}, ran for ${runtime?.toFixed(1)} sec`);
-            this.setState({ serviceStatus: alive, runtime });
-            if(!alive) {
-                this.setState({ percent: 0, stButton: false });
-                if(this.state.logText === "Transcription in progress...")
-                    this.setState({ logText: "Your files are ready!" });
-                clearInterval(this.state.reportInterval);
-            } else {
-                this.setState({ stButton: true });
-            }
-        }
-
-        if (message?.data?.Stdout) {
-            const logLine = message.data.Stdout[0];
-            console.log("[mqtt] log:", logLine);
-            const percentMatch = logLine.match(/(\d+)(%|٪)/);
-            if (percentMatch) {
-                const percent = parseInt(percentMatch[1]);
-                console.log("[mqtt] percent:", percent);
-                this.setState({ percent, logText: "Transcription in progress..." });
-            }
-        }
-    }
-
-    sendMessage = () => {
-        mqtt.send("start", false, "exec/service/ai-trns/python");
-    }
-
-    sendStatus = () => {
-        mqtt.send("status", false, "exec/service/ai-trns/python");
-    }
-
-    buttonDisable = () => {
-        this.setState({stButton: true});
-        setTimeout(() => {
-            this.setState({stButton: false});
-        }, 20000);
-    }
-
-    startTranscription = () => {
-        this.setState({ logText: "Transcription in progress..." });
-        this.buttonDisable();
-        this.sendMessage();
-        setTimeout(() => {
-            const reportInterval = setInterval(() => {
-                mqtt.send("report", false, "exec/service/ai-trns/python");
-                mqtt.send("status", false, "exec/service/ai-trns/python");
-            }, 1000);
-            this.setState({reportInterval});
-        }, 3000);
-    }
-
-    // Methods for working with configuration
-    loadConfigFields = async () => {
-        this.setState({ configLoading: true });
-
+    const download = async (format) => {
         try {
-            const config = await getConfig();
-            const parsed = parseArgsFromConfig(config);
-            this.setState({
-                inputFile: parsed.inputFile,
-                outputFormats: parsed.outputFormats,
-                language: parsed.language
-            });
-        } catch (error) {
-            console.error('Configuration loading error:', error);
-            alert('Configuration loading error');
-        } finally {
-            this.setState({ configLoading: false });
+            const res = await jobResult(done.id, format);
+            saveBlob(await res.blob(), `${done.name}.${format}`);
+        } catch (err) {
+            setError(`Download failed: ${err.message}`);
         }
-    }
+    };
 
-    saveConfiguration = async (startTranscription) => {
-        const { inputFile, outputFormats, language } = this.state;
-        this.setState({ configLoading: true });
+    const opt = (
+        <Card className="text-base">
+            <MediaSource file={file} onFileChange={chooseFile} link={link} onLinkChange={typeLink} disabled={busy} />
 
-        try {
-            // Create arguments array
-            const args = createArgsArray(inputFile, outputFormats, language);
+            <div className="mt-5 h-6 overflow-hidden rounded bg-slate-200">
+                <div className="h-full bg-blue-600 text-xs leading-6 font-semibold text-white transition-all"
+                     style={{ width: `${percent}%` }}>
+                    {percent > 0 && `${percent}%`}
+                </div>
+            </div>
+            <pre className="mt-2.5 font-mono whitespace-pre-wrap">{logText}</pre>
+            {error && <Message tone="error" className="mt-2 text-left">{error}</Message>}
 
-            // Update whisper service arguments via correct API
-            await updateServiceArgs('whisper', args);
-            if(startTranscription) this.startTranscription()
-        } catch (error) {
-            console.error('Configuration saving error:', error);
-            alert('Configuration saving error');
-        } finally {
-            this.setState({ configLoading: false });
-        }
-    }
+            {done && (
+                <TranscriptionResults formats={done.formats} onDownload={download} jobId={done.id}
+                                      audioFile={done.file} url={done.url} />
+            )}
 
-    handleInputFileChange = (value) => {
-        this.setState({ inputFile: value, audioFile: null });
-    }
+            <TranscriptionSettings
+                language={language}
+                outputFormats={outputFormats}
+                onLanguageChange={setLanguage}
+                onFormatChange={setOutputFormats}
+            />
 
-    handleFormatChange = (outputFormats) => {
-        this.setState({ outputFormats });
-    }
+            <Button variant='primary' size='xl' className='mt-6' disabled={!canStart} loading={busy} onClick={start}>
+                Start Transcription
+            </Button>
+        </Card>
+    );
 
-    handleLanguageChange = (language) => {
-        this.setState({ language });
-    }
-
-    handleDownload = async (fileName) => {
-        try {
-            saveBlob(await fetchExecFile(fileName), fileName);
-        } catch (error) {
-            console.error('Download error:', error);
-            alert(`Ошибка при загрузке файла: ${error.message}`);
-        }
-    }
-
-    render() {
-        const {user, stButton} = this.state;
-
-        const opt = (
-                    <Card className="text-base">
-                        <MediaSource
-                            inputFile={this.state.inputFile}
-                            onInputFileChange={this.handleInputFileChange}
-                            onUploadStart={this.uploadStart}
-                            onUploadProgress={this.progress}
-                            onUploadDone={this.uploadDone}
-                        />
-
-                        <div className="mt-5 h-6 overflow-hidden rounded bg-slate-200">
-                            <div className="h-full bg-blue-600 text-xs leading-6 font-semibold text-white transition-all"
-                                 style={{width: `${this.state.percent}%`}}>
-                                {this.state.percent > 0 && `${this.state.percent}%`}
-                            </div>
-                        </div>
-                        <pre className="mt-2.5 font-mono whitespace-pre-wrap">
-                             {this.state.logText}
-                        </pre>
-
-                        {this.state.logText === "Your files are ready!" && (
-                            <TranscriptionResults onDownload={this.handleDownload} audioFile={this.state.audioFile} />
-                        )}
-
-                        <TranscriptionSettings
-                            language={this.state.language}
-                            outputFormats={this.state.outputFormats}
-                            onLanguageChange={this.handleLanguageChange}
-                            onFormatChange={this.handleFormatChange}
-                        />
-
-                        <Button variant='primary' size='xl' className='mt-6' disabled={stButton} onClick={() => this.saveConfiguration(true)} >
-                            Start Transcription
-                        </Button>
-
-                    </Card>);
-
-        return (
-            <Fragment>
-                <LoginPage user={user} enter={opt} checkPermission={this.checkPermission} />
-            </Fragment>
-
-        );
-    }
-}
+    return (
+        <Fragment>
+            <LoginPage user={user} enter={opt} checkPermission={setUser} />
+        </Fragment>
+    );
+};
 
 export default Transcription;

@@ -1,9 +1,5 @@
-export const MQTT_URL = import.meta.env.REACT_APP_MQTT_URL;
-export const WEB_URL = import.meta.env.REACT_APP_WEB_URL;
-export const AI_BACKEND = import.meta.env.REACT_APP_AI_BACKEND;
-export const EXEC_API = import.meta.env.REACT_APP_EXEC_API;
 export const STT_API = import.meta.env.REACT_APP_STT_API;
-// ai-trns REST API: transcription jobs (/jobs) and STT review (/review/*)
+// ai-trns REST API: transcription jobs (/jobs, Transcription and תמלול) and STT review (/review/*)
 export const AI_TRNS_API = import.meta.env.REACT_APP_AI_TRNS_API;
 export const STT_MODEL = import.meta.env.REACT_APP_STT_MODEL;
 // stt-api's transcription job (the older service), offered on the compare page next to ai-trns

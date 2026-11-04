@@ -15,7 +15,7 @@ const Live = lazy(() => import('./pages/Live'));
 // A tool owns everything under its path (e.g. /review/...).
 // disabled: shown greyed out in the menu, no route. sttApi: needs stt-api (shows its health in the menu).
 // keepAlive: once opened, stays mounted (hidden) while other tools are shown -- for pages that
-// hold a session (Keycloak init, MQTT connection, running job) and can't be remounted.
+// hold a session (Keycloak init, running job) and can't be remounted.
 export const TOOLS = [
   { path: 'transcription', title: 'Transcription', element: <Transcription />, keepAlive: true },
   { path: 'speakers', title: 'Speakers', element: <Speakers />, sttApi: true, disabled: true },

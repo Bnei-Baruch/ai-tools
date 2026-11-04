@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { diarizeSrt } from '../api/stt';
-import { fetchExecFile } from '../api/exec';
+import { jobResult } from '../api/aiTrns';
 import { saveBlob } from '../utils';
 import useApiCall from '../hooks/useApiCall';
 import FileField from '../components/form/FileField';
@@ -13,7 +13,7 @@ import SpeakerHints from '../components/speakers/SpeakerHints';
 import { Button, Card, Message, Page, PageHeader } from '../components/ui';
 
 const Speakers = () => {
-    // Transcription hands over {execSrt: 'output.srt', audio: File | null}
+    // Transcription hands over {jobId, audio: File | null, url: string | null}
     const { state: handover } = useLocation();
     const [audio, setAudio] = useState(handover?.audio ?? null);
     const [srt, setSrt] = useState(null);
@@ -24,10 +24,11 @@ const Speakers = () => {
     const call = useApiCall();
 
     useEffect(() => {
-        if (!handover?.execSrt) return;
-        fetchExecFile(handover.execSrt)
-            .then((blob) => setSrt(new File([blob], handover.execSrt, { type: 'application/x-subrip' })))
-            .catch((err) => setHandoverError(`Can't load ${handover.execSrt}: ${err.message}`));
+        if (!handover?.jobId) return;
+        jobResult(handover.jobId, 'srt')
+            .then((res) => res.blob())
+            .then((blob) => setSrt(new File([blob], 'transcription.srt', { type: 'application/x-subrip' })))
+            .catch((err) => setHandoverError(`Can't load the transcription: ${err.message}`));
     }, [handover]);
 
     const handleSubmit = async (e) => {
@@ -50,7 +51,7 @@ const Speakers = () => {
                 <PageHeader title='Speakers' subheader='Audio + SRT: every cue gets a speaker label' />
                 <form onSubmit={handleSubmit}>
                     {handoverError && <Message tone='warning' className='mb-4'>{handoverError}</Message>}
-                    {handover?.execSrt && !audio && (
+                    {handover?.jobId && !audio && (
                         <Message tone='info' className='mb-4'>Choose the audio file that was transcribed</Message>
                     )}
                     <div className='grid gap-4 sm:grid-cols-2'>

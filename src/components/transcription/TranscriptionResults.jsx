@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { isToolEnabled } from '../../tools';
 import { Button } from '../ui';
 
-// audioFile: the uploaded File (null for a link), handed over to the Speakers tool with output.srt
-const TranscriptionResults = ({ onDownload, audioFile }) => (
+// formats: what the job was asked for; jobId with the uploaded audioFile or the url go to the Speakers tool
+const TranscriptionResults = ({ formats, onDownload, jobId, audioFile, url }) => (
     <div className="mt-5 flex flex-wrap justify-center gap-2.5">
-        <Button variant="gray" onClick={() => onDownload('output.txt')}>⬇ Download output.txt</Button>
-        <Button variant="gray" onClick={() => onDownload('output.srt')}>⬇ Download output.srt</Button>
+        {formats.map((f) => (
+            <Button key={f} variant="gray" onClick={() => onDownload(f)}>⬇ Download {f}</Button>
+        ))}
         {isToolEnabled('speakers') && (
-            <Button variant="teal" as={Link} to="/speakers" state={{execSrt: 'output.srt', audio: audioFile}}>
+            <Button variant="teal" as={Link} to="/speakers" state={{ jobId, audio: audioFile, url }}>
                 👥 Add speakers
             </Button>
         )}

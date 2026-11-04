@@ -1,5 +1,4 @@
 import Keycloak from 'keycloak-js';
-import mqtt from "./mqtt";
 import {KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID} from "../consts";
 
 const userManagerConfig = {
@@ -39,11 +38,6 @@ kc.onAuthLogout = () => {
 const renewToken = (retry) => {
     retry++;
     kc.updateToken(5)
-        .then((refreshed) => {
-            if (refreshed) {
-                mqtt.setToken(kc.token);
-            }
-        })
         .catch((err) => {
             console.error(err)
             renewRetry(retry);
@@ -62,9 +56,7 @@ const renewRetry = (retry) => {
 
 const setData = () => {
     const {realm_access: {roles}, sub, given_name, name, email} = kc.tokenParsed;
-    const user = {display: name, email, roles, id: sub, username: given_name};
-    mqtt.setToken(kc.token);
-    return user;
+    return {display: name, email, roles, id: sub, username: given_name};
 }
 
 // keycloak-js allows init() only once per instance; later calls reuse its result.
