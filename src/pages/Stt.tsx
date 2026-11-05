@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { STT_MODEL } from '../consts';
 import { chunksToVtt, startTranscribe, transcriptOf, type Chunk, type SttResult } from '../api/transcribe';
 import { resumeJob, waitJob, type Job } from '../api/aiTrns';
-import { paragraphsOf, startSpeakerParagraphs } from '../api/speakers';
+import { paragraphsOf, sourcesUsed, startSpeakerParagraphs } from '../api/speakers';
 import { fetchUnit, fileUrl, pickFiles } from '../api/kmedia';
 import { wordsToSrt } from '../api/tools';
 import { inputKey, parseSttInput, type SttInput } from '../stt/input';
@@ -112,7 +112,6 @@ export default function Stt() {
       } else {
         const started = await startSpeakerParagraphs(m.audio, chunks, m.uid);
         if (stale()) return;
-        setWithSource(started.withSource);
         setParams((p) => {
           const next = new URLSearchParams(p);
           next.set('speakers', started.job.id);
@@ -121,7 +120,10 @@ export default function Stt() {
         job = await waitJob(started.job, onJob);
       }
       const value = await paragraphsOf(job.id);
-      if (!stale()) setSpeakers({ status: 'done', job, value });
+      if (stale()) return;
+      const used = sourcesUsed(job);
+      if (used !== null) setWithSource(used.length > 0);
+      setSpeakers({ status: 'done', job, value });
     } catch (err) {
       if (err instanceof Stale || stale()) return;
       setSpeakers((s) => ({ status: 'error', job: s.status === 'running' ? s.job : undefined, error: message(err) }));

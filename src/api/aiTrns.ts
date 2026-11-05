@@ -30,7 +30,8 @@ export interface Job {
   progress?: number | null;
   queue_position?: number | null;
   error?: string | null;
-  stats?: Record<string, number> | null;
+  // numbers, and lists such as a diarize job's sources ({id, name, unit, kind, matched_words, used})
+  stats?: Record<string, any> | null;
   // epoch seconds
   created?: number | null;
   started?: number | null;

@@ -1,6 +1,5 @@
 import { chunksToSrt, type Chunk } from './transcribe';
 import { formOf, jobResult, postJob, waitJob, type Job } from './aiTrns';
-import { fetchLessonSource } from './kmedia';
 
 // One paragraph of an ai-trns diarize job (?format=paragraphs): a new one at every speaker change, the
 // Rav's speech split by the paragraphing model. label: רב / קריין / תלמיד (ai-trns labels.py).
@@ -13,24 +12,25 @@ interface Paragraph {
   words: { word: string; start: number; end: number }[];
 }
 
-// The lesson's source text, so turns reading it are labeled the reader's (קריין): the form fields for it, and
-// whether the job has one. Until ai-trns with `uid` is deployed (it finds the lesson's sources itself, ai-trns
-// TASK-speakers-paragraphs.md), both go: the old server ignores `uid`, the new one prefers the uploaded file.
-// After the deploy this becomes
-//   return { fields: { uid }, withSource: !!uid };
-// (which sources the server used: the job's stats.sources).
-async function lessonSourceFields(uid?: string | null): Promise<{ fields: Record<string, unknown>; withSource: boolean }> {
-  const source = uid ? await fetchLessonSource(uid).catch(() => null) : null;
-  return { fields: { uid, source }, withSource: !!source };
+// The lesson's source text, so turns reading it are labeled the reader's (קריין): ai-trns finds the lesson's
+// sources itself by its uid (its linked sources and LIKUTIM); which ones it used: sourcesUsed(job) once it's done.
+function lessonSourceFields(uid?: string | null): Record<string, unknown> {
+  return uid ? { uid } : {};
+}
+
+// The sources a finished diarize job used (stats.sources, `used`): their names; null if the job doesn't say
+export function sourcesUsed(job: Job): string[] | null {
+  const sources = job.stats?.sources;
+  if (!Array.isArray(sources)) return null;
+  return sources.filter((s) => s && s.used).map((s) => String(s.name ?? s.id));
 }
 
 // Starts a diarize job with paragraphs for the model's transcript (its chunks) of the audio at `url`.
 // uid: the kabbalahmedia lesson, for its source (see lessonSourceFields); none -> the reader is told by voice only.
-export async function startSpeakerParagraphs(url: string, chunks: Chunk[], uid?: string | null): Promise<{ job: Job; withSource: boolean }> {
+export async function startSpeakerParagraphs(url: string, chunks: Chunk[], uid?: string | null): Promise<{ job: Job }> {
   const srt = new File([chunksToSrt(chunks)], 'transcript.srt', { type: 'application/x-subrip' });
-  const { fields, withSource } = await lessonSourceFields(uid);
-  const job = await postJob('/diarize/words', formOf({ url, srt, paragraphs: 'true', ...fields }));
-  return { job, withSource };
+  const job = await postJob('/diarize/words', formOf({ url, srt, paragraphs: 'true', ...lessonSourceFields(uid) }));
+  return { job };
 }
 
 // A finished diarize job's paragraphs, as chunks (speaker label, start / end of each word)
