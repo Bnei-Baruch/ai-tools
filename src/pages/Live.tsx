@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { GOOGLE_API_KEY, GOOGLE_CLIENT_ID, LIVE_STREAM_URL } from '../consts';
-import { BrowserDocWriter, GoogleError, createDoc, docId, docUrl, loadGis, pickDoc } from '../api/gdoc';
+import { GOOGLE_ACCOUNT, GOOGLE_API_KEY, GOOGLE_CLIENT_ID, LIVE_STREAM_URL } from '../consts';
+import {
+  BrowserDocWriter, GoogleError, createDoc, currentGoogleAccount, docId, docUrl, googleAccount, loadGis, pickDoc,
+  switchGoogleAccount,
+} from '../api/gdoc';
 import { kc } from '../api/UserManager';
 import { fetchUnit, fileUrl, parseUnitUid, pickFiles } from '../api/kmedia';
 import {
-  addListenerDoc, dropListenerDoc, listenLive, liveResult, startLive, stopLive,
+  DocTaken, addListenerDoc, dropListenerDoc, listenLive, liveResult, startLive, stopLive,
   type ListenerDoc, type LiveEvent, type LiveWord, type ServerDoc,
 } from '../api/live';
 import useObjectUrl from '../hooks/useObjectUrl';
@@ -42,6 +45,9 @@ const STATE_LABELS: Record<State, string> = {
 
 // a word stays highlighted this long after its end, across short pauses
 const HIGHLIGHT_TAIL = 0.6;
+
+// the Google account docs are written as: the one this browser used last, the configured one, the user's e-mail
+const docAccount = () => googleAccount(GOOGLE_ACCOUNT || kc.tokenParsed?.email || '');
 
 // A kabbalahmedia.info lesson link -> its Hebrew audio (and video); otherwise a direct media link.
 async function resolveMedia(link: string): Promise<Media> {
@@ -123,6 +129,7 @@ export default function Live() {
   const [myDoc, setMyDoc] = useState<string | null>(null);
   // the Google token ran out: words wait for a click on "renew"
   const [needsGoogle, setNeedsGoogle] = useState(false);
+  const [googleUser, setGoogleUser] = useState(docAccount);
   const finalsRef = useRef<LiveWord[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -142,11 +149,19 @@ export default function Live() {
     void writer.current?.stop();
   }, []);
 
-  // while this page writes its doc during a stream, keep it on the list the other listeners see
+  // while this page writes its doc during a stream, keep it on the list the other listeners see. Another
+  // page writing it already (this one was chosen before the stream, or went quiet): this one stops.
   useEffect(() => {
     if (!myDoc || !jobId || !busy) return;
     const title = writer.current?.title ?? '';
-    const tell = () => void addListenerDoc(jobId, myDoc, title).catch(() => {});
+    const tell = () => void addListenerDoc(jobId, myDoc, title).catch((err) => {
+      if (!(err instanceof DocTaken) || docUrl(writer.current?.id ?? '') !== myDoc) return;
+      writer.current?.cancel();
+      writer.current = null;
+      setMyDoc(null);
+      setNeedsGoogle(false);
+      setDocError(err.message);
+    });
     tell();
     const timer = window.setInterval(tell, DOC_ALIVE_MS);
     return () => window.clearInterval(timer);
@@ -306,11 +321,12 @@ export default function Live() {
     setDocBusy(true);
     setDocError(null);
     try {
-      const hint = kc.tokenParsed?.email ?? '';
+      const hint = docAccount();
       let id = linked ?? (how === 'new'
         ? await createDoc(GOOGLE_CLIENT_ID, `תמלול חי ${new Date().toLocaleString('he-IL')}`, hint)
         : await pickDoc(GOOGLE_CLIENT_ID, GOOGLE_API_KEY!, hint));
       if (!id) return;
+      claim(id);
       let w: BrowserDocWriter;
       try {
         w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, hint);
@@ -322,7 +338,20 @@ export default function Live() {
         }
         id = await pickDoc(GOOGLE_CLIENT_ID, GOOGLE_API_KEY, hint, linked);
         if (!id) return;
+        claim(id);
         w = await BrowserDocWriter.open(GOOGLE_CLIENT_ID, id, setDocError, hint);
+      }
+      // during a stream: the API says whether another page writes it, before a word is written
+      if (jobId && busy) {
+        try {
+          await addListenerDoc(jobId, docUrl(id), w.title);
+        } catch (err) {
+          // not reachable now: it is said again every DOC_ALIVE_MS
+          if (err instanceof DocTaken) {
+            w.cancel();
+            throw err;
+          }
+        }
       }
       w.onNeedsGoogle = setNeedsGoogle;
       if (busy) w.push(finalsRef.current.map((f) => f.word));
@@ -333,8 +362,33 @@ export default function Live() {
     } catch (err) {
       setDocError(err instanceof Error ? err.message : String(err));
     } finally {
+      setGoogleUser(currentGoogleAccount() || docAccount());
       setDocBusy(false);
     }
+  }
+
+  // Google's account chooser: docs are written as the account chosen from now on (this browser remembers it)
+  async function switchAccount() {
+    if (!GOOGLE_CLIENT_ID) return;
+    setDocBusy(true);
+    setDocError(null);
+    try {
+      setGoogleUser(await switchGoogleAccount(GOOGLE_CLIENT_ID));
+    } catch (err) {
+      setDocError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDocBusy(false);
+    }
+  }
+
+  // a doc the stream's list shows as written already (by the server or another page): writing it here
+  // too would append the same text a second time
+  function claim(id: string) {
+    const url = docUrl(id);
+    if (url === myDoc) return;
+    if (serverDoc?.url === url) throw new Error('זה מסמך השידור: השרת כבר כותב אליו — פשוט פתחו אותו');
+    const other = listenerDocs.find((d) => d.url === url);
+    if (other) throw new Error(`${other.by} כבר כותב/ת למסמך הזה — פשוט פתחו אותו`);
   }
 
   function stopMyDoc() {
@@ -512,9 +566,15 @@ export default function Live() {
                     disabled={docBusy || !GOOGLE_CLIENT_ID}>בחר מסמך קיים</button>
                 )}
               </div>
+              {GOOGLE_CLIENT_ID && (
+                <div className="live__doc-row">
+                  <span className="muted" dir="ltr">Google: {googleUser || '—'}</span>
+                  <button type="button" className="btn" onClick={switchAccount} disabled={docBusy}>החלף חשבון</button>
+                </div>
+              )}
               <span className="muted live__doc-hint">
                 {GOOGLE_CLIENT_ID
-                  ? 'נכתב מחשבון ה-Google שלכם, כל עוד הדף פתוח'
+                  ? 'נכתב מחשבון ה-Google הזה, כל עוד הדף פתוח'
                   : 'כתיבה למסמך Google אישי עדיין לא הוגדרה'}
               </span>
             </>

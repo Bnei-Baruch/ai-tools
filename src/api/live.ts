@@ -39,18 +39,35 @@ export interface ListenerDoc {
   by: string;
 }
 
+// this page, to the API: one page writes a doc (another tab of the same user is another page)
+const PAGE = crypto.randomUUID();
+
+// Another page (or the server) already writes this doc: a second one would append the same text again.
+export class DocTaken extends Error {
+  constructor(detail: string) {
+    super(`המסמך הזה כבר נכתב מדף אחר — פתחו אותו במקום לכתוב אליו (${detail})`);
+  }
+}
+
 // This page writes the text into a doc of its user's; repeat it while writing (the API forgets a doc
-// whose page has not said so for a minute).
+// whose page has not said so for a minute). DocTaken: another page writes it.
 export async function addListenerDoc(jobId: string, url: string, title: string): Promise<void> {
   const form = new FormData();
   form.set('url', url);
   form.set('title', title);
+  form.set('page', PAGE);
   const res = await aiTrnsFetch(`/live/${jobId}/doc`, { method: 'PUT', body: form });
+  if (res.status === 409) {
+    const detail = await res.json().then((d) => String(d?.detail ?? ''), () => '');
+    // a job that is already finished is 409 too: nothing to write any more, not a taken doc
+    if (!/already finished/.test(detail)) throw new DocTaken(detail);
+  }
   if (!res.ok) throw await errorFrom(res);
 }
 
 export async function dropListenerDoc(jobId: string, url: string): Promise<void> {
-  await aiTrnsFetch(`/live/${jobId}/doc?url=${encodeURIComponent(url)}`, { method: 'DELETE' }).catch(() => {});
+  await aiTrnsFetch(`/live/${jobId}/doc?url=${encodeURIComponent(url)}&page=${PAGE}`, { method: 'DELETE' })
+    .catch(() => {});
 }
 
 interface Job {

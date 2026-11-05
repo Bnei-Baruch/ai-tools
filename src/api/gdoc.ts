@@ -9,6 +9,9 @@
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DOCS = 'https://docs.googleapis.com/v1/documents';
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
+const ABOUT = 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)';
+// the Google account this browser writes docs as, once known (chosen or switched to)
+const ACCOUNT_KEY = 'gdoc.account';
 const FLUSH_MS = 3000;
 
 interface TokenResponse {
@@ -70,6 +73,28 @@ function loadScript(src: string): Promise<void> {
   return loading;
 }
 
+function storedAccount(): string {
+  try {
+    return localStorage.getItem(ACCOUNT_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function storeAccount(email: string) {
+  try {
+    localStorage.setItem(ACCOUNT_KEY, email);
+  } catch {
+    // no storage: it is asked for again next time
+  }
+}
+
+// The Google account to write as: the one this browser used last, else fallback (the configured account,
+// else the user's e-mail). Given to Google as login_hint, so it does not ask to choose an account.
+export function googleAccount(fallback = ''): string {
+  return storedAccount() || fallback;
+}
+
 export const loadGis = () => loadScript('https://accounts.google.com/gsi/client');
 
 async function loadPicker(): Promise<void> {
@@ -100,7 +125,7 @@ export class NeedsGoogle extends Error {
 // user's e-mail, so Google skips choosing an account when that one is signed in.
 class GoogleAuth {
   private clientId: string;
-  private hint: string;
+  hint: string;
   private client: TokenClient | null = null;
   private token = '';
   private expires = 0;
@@ -110,13 +135,26 @@ class GoogleAuth {
     this.hint = hint;
   }
 
+  // login_hint is set when the token client is made: another account makes a new one (and a new token)
+  setHint(hint: string) {
+    if (!hint || hint === this.hint) return;
+    this.hint = hint;
+    this.client = null;
+    this.token = '';
+  }
+
   valid(): string | null {
     return this.token && Date.now() < this.expires - 60_000 ? this.token : null;
   }
 
-  async request(): Promise<string> {
+  // select: Google shows its account chooser (switching accounts); the account chosen is remembered
+  async request(select = false): Promise<string> {
     await loadGis();
-    return new Promise((resolve, reject) => {
+    if (select) {
+      this.client = null;
+      this.token = '';
+    }
+    const token = await new Promise<string>((resolve, reject) => {
       const done = (r: TokenResponse) => {
         if (!r.access_token) return reject(new Error(r.error_description || r.error || 'Google: אין הרשאה'));
         this.token = r.access_token;
@@ -126,13 +164,32 @@ class GoogleAuth {
       this.client ??= window.google!.accounts.oauth2.initTokenClient({
         client_id: this.clientId,
         scope: SCOPE,
-        ...(this.hint ? { login_hint: this.hint } : {}),
+        ...(this.hint && !select ? { login_hint: this.hint } : {}),
         callback: done,
         error_callback: (e) => reject(new Error(e.message || e.type)),
       });
       this.client.callback = done;
-      this.client.requestAccessToken({ prompt: this.token ? '' : undefined });
+      this.client.requestAccessToken({ prompt: select ? 'select_account' : this.token ? '' : undefined });
     });
+    await this.learnAccount(token);
+    return token;
+  }
+
+  // which account the token is of (drive.file is enough for about.get): next time it is the hint
+  private async learnAccount(token: string) {
+    try {
+      const res = await fetch(ABOUT, { headers: { Authorization: `Bearer ${token}` } });
+      const email: string | undefined = res.ok ? (await res.json())?.user?.emailAddress : undefined;
+      if (!email) return;
+      storeAccount(email);
+      if (email !== this.hint) {
+        this.hint = email;
+        // the token client keeps its old login_hint: a new one on the next request
+        this.client = null;
+      }
+    } catch {
+      // not known: Google may ask to choose again next time
+    }
   }
 
   async accessToken(interactive: boolean): Promise<string> {
@@ -151,7 +208,20 @@ let auth: GoogleAuth | null = null;
 
 function googleAuth(clientId: string, hint = ''): GoogleAuth {
   auth ??= new GoogleAuth(clientId, hint);
+  auth.setHint(hint);
   return auth;
+}
+
+// The account this page writes as, if known: the one Google gave a token for, else the remembered one.
+export function currentGoogleAccount(): string {
+  return auth?.hint || storedAccount();
+}
+
+// Google's account chooser (call it on a click): a token for another account, which is remembered; its e-mail.
+export async function switchGoogleAccount(clientId: string): Promise<string> {
+  const a = googleAuth(clientId);
+  await a.request(true);
+  return a.hint;
 }
 
 async function api(clientId: string, method: string, path: string, body: unknown, interactive: boolean): Promise<any> {
@@ -286,6 +356,12 @@ export class BrowserDocWriter {
     await googleAuth(this.clientId).request();
     this.onNeedsGoogle(false);
     await this.flush();
+  }
+
+  // Stops without writing what is left (another page writes this doc).
+  cancel() {
+    window.clearInterval(this.timer);
+    this.pending = [];
   }
 
   // Writes what is left, then stops.

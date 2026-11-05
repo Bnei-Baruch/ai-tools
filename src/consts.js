@@ -11,6 +11,10 @@ export const LIVE_STREAM_URL = import.meta.env.REACT_APP_LIVE_STREAM_URL;
 export const GOOGLE_CLIENT_ID = import.meta.env.REACT_APP_GOOGLE_CLIENT_ID;
 // Google's picker for choosing an existing doc: an API key (Picker API, restricted to this site); empty = new docs only
 export const GOOGLE_API_KEY = import.meta.env.REACT_APP_GOOGLE_API_KEY;
+// The Google account the doc is written as by default (login_hint: no account chooser); a user may switch
+// to another, which their browser remembers. Empty = the user's Keycloak e-mail. Not a secret: Google still
+// wants that account signed in in the browser.
+export const GOOGLE_ACCOUNT = import.meta.env.REACT_APP_GOOGLE_ACCOUNT;
 // All reviewers share one set (the API routes still take a set id).
 export const REVIEW_SET = 'main';
 // Defaults so a build with an older .env still starts: new Keycloak() throws without them.

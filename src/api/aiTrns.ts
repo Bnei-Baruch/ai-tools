@@ -30,7 +30,12 @@ export interface Job {
   progress?: number | null;
   queue_position?: number | null;
   error?: string | null;
-  stats?: Record<string, number> | null;
+  // numbers, and lists such as a diarize job's sources ({id, name, unit, kind, matched_words, used})
+  stats?: Record<string, any> | null;
+  // epoch seconds
+  created?: number | null;
+  started?: number | null;
+  finished?: number | null;
 }
 
 // Cloudflare in front of ai-tools.kab.info rejects request bodies above 100 MB.
@@ -81,6 +86,13 @@ export async function waitJob(job: Job, onUpdate?: (job: Job) => void): Promise<
   }
   if (job.status !== 'done') throw new Error(job.error || 'העבודה נכשלה');
   return job;
+}
+
+// An existing job by id (e.g. from the page's address), waited for as waitJob does
+export async function resumeJob(jobId: string, onUpdate?: (job: Job) => void): Promise<Job> {
+  const res = await aiTrnsFetch(`/jobs/${encodeURIComponent(jobId)}`);
+  if (!res.ok) throw detail(res.status, res.statusText, await res.text().catch(() => ''));
+  return waitJob((await res.json()) as Job, onUpdate);
 }
 
 // GET /jobs/{id}/result?format=...: the response, or an error
