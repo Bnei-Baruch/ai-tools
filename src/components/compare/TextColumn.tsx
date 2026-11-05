@@ -5,7 +5,7 @@ import type { Hunk, Word } from '../../compare/compare';
 type Side = 'human' | 'model';
 
 // speaker label -> CSS modifier (labels come from ai-trns labels.py)
-const SPEAKER_CLASS: Record<string, string> = { 'רב': 'rav', 'קריין': 'reader', 'תלמיד': 'student' };
+const SPEAKER_CLASS: Record<string, string> = { 'הרב': 'rav', 'קריין': 'reader', 'תלמיד': 'student' };
 
 export type MarkState = 'marked' | 'incomplete' | null;
 

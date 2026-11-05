@@ -5,23 +5,23 @@ import { chunksToSrt, parseSrt } from '../api/srt.ts';
 import type { Chunk } from '../api/transcribe';
 
 const paragraphs: Chunk[] = [
-  { start: 0, end: 2, text: 'שלום לכולם', speaker: 'רב', times: [0, 1], ends: [0.8, 1.9] },
-  { start: 2, end: 3, text: 'ממשיכים', speaker: 'רב', times: [2.1], ends: [2.9] },
+  { start: 0, end: 2, text: 'שלום לכולם', speaker: 'הרב', times: [0, 1], ends: [0.8, 1.9] },
+  { start: 2, end: 3, text: 'ממשיכים', speaker: 'הרב', times: [2.1], ends: [2.9] },
   { start: 3, end: 5, text: 'קטע מספר 1', speaker: 'קריין', times: [3, 3.5, 4] },
   { start: 5, end: 6, text: 'שאלה <קטנה> & עוד', speaker: 'תלמיד' },
 ];
 
 test('paragraphsToTxt: blank line between paragraphs, label where the speaker changes', () => {
   assert.equal(paragraphsToTxt(paragraphs),
-    'רב: שלום לכולם\n\nממשיכים\n\nקריין: קטע מספר 1\n\nתלמיד: שאלה <קטנה> & עוד\n');
+    'הרב: שלום לכולם\n\nממשיכים\n\nקריין: קטע מספר 1\n\nתלמיד: שאלה <קטנה> & עוד\n');
   assert.equal(paragraphsToTxt([{ start: 0, end: 1, text: 'בלי דובר' }]), 'בלי דובר\n');
 });
 
 test('paragraphWords: the words for /diarize/words/srt, each with its paragraph speaker', () => {
   const words = paragraphWords(paragraphs);
   assert.equal(words.length, 2 + 1 + 3 + 4);
-  assert.deepEqual(words[0], { word: 'שלום', start: 0, end: 0.8, speaker: 'רב' });
-  assert.deepEqual(words[2], { word: 'ממשיכים', start: 2.1, end: 2.9, speaker: 'רב' });
+  assert.deepEqual(words[0], { word: 'שלום', start: 0, end: 0.8, speaker: 'הרב' });
+  assert.deepEqual(words[2], { word: 'ממשיכים', start: 2.1, end: 2.9, speaker: 'הרב' });
   // no ends: up to the next word, the last one to the paragraph's end
   assert.deepEqual(words.slice(3, 6).map((w) => [w.start, w.end, w.speaker]), [[3, 3.5, 'קריין'], [3.5, 4, 'קריין'], [4, 5, 'קריין']]);
   // no times: spread over the paragraph

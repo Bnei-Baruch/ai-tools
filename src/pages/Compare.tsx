@@ -53,7 +53,7 @@ interface Result {
   chunks: Chunk[];
 }
 
-// The speakers view: the model's text in paragraphs with רב / קריין / תלמיד (an ai-trns diarize job)
+// The speakers view: the model's text in paragraphs with הרב / קריין / תלמיד (an ai-trns diarize job)
 type SpeakersState =
   | { status: 'off' | 'loading' }
   | { status: 'error'; error: string }

@@ -1,5 +1,6 @@
 import { aiTrnsFetch, waitJob, type Job } from './aiTrns';
 import { parseSrt } from './srt.ts';
+import { clipFields, type Clip } from '../stt/input.ts';
 
 // SRT helpers live in srt.ts (no browser imports, so node tests can use them)
 export { chunksToSrt, parseSrt } from './srt.ts';
@@ -45,12 +46,14 @@ export async function transcribe(url: string): Promise<SttResult> {
   return transcriptOf(job.id);
 }
 
-// POST /jobs for a media URL (Hebrew, SRT) -> the queued job; wait for it with waitJob / resumeJob (aiTrns.ts)
-export async function startTranscribe(url: string): Promise<Job> {
+// POST /jobs for a media URL (Hebrew, SRT) -> the queued job; wait for it with waitJob / resumeJob (aiTrns.ts).
+// clip: only that part of the media (the result's times are the media's)
+export async function startTranscribe(url: string, clip?: Clip | null): Promise<Job> {
   const form = new FormData();
   form.set('url', url);
   form.set('lang', 'he');
   form.set('format', 'srt');
+  for (const [k, v] of Object.entries(clipFields(clip))) form.set(k, v);
   return json<Job>(await aiTrnsFetch('/jobs', { method: 'POST', body: form }));
 }
 

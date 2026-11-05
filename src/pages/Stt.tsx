@@ -6,7 +6,7 @@ import { resumeJob, waitJob, type Job } from '../api/aiTrns';
 import { paragraphsOf, sourcesUsed, startSpeakerParagraphs } from '../api/speakers';
 import { fetchUnit, fileUrl, pickFiles } from '../api/kmedia';
 import { wordsToSrt } from '../api/tools';
-import { inputKey, parseSttInput, type SttInput } from '../stt/input';
+import { formatTime, inputKey, parseSttInput, type Clip, type SttInput } from '../stt/input';
 import { DOCX_TYPE, paragraphWords, paragraphsToDocx, paragraphsToTxt } from '../stt/export';
 import { modelWords, wordAt } from '../compare/compare';
 import { formatElapsed, saveBlob } from '../utils';
@@ -27,6 +27,8 @@ interface Media {
   title?: string;
   // a kabbalahmedia lesson: its source tells the reader (קריין) apart
   uid?: string;
+  // a part of the lesson (its link's sstart / send): only it is processed, the times stay the lesson's
+  clip?: Clip;
 }
 
 type Stage<T> =
@@ -51,10 +53,17 @@ async function resolveMedia(input: SttInput): Promise<Media> {
   return {
     audio: fileUrl(audio),
     video: video && fileUrl(video),
-    title: [unit.name, unit.film_date].filter(Boolean).join(' · '),
+    title: [unit.name, unit.film_date, input.clip && clipText(input.clip)].filter(Boolean).join(' · '),
     uid: unit.id,
+    clip: input.clip,
   };
 }
+
+const clipText = (clip: Clip) => `${formatTime(clip.start)}–${clip.end === null ? '' : formatTime(clip.end)}`;
+
+// the player plays the clip only (a media fragment: from its start, pausing at its end)
+const withClip = (src: string, clip?: Clip) =>
+  clip ? `${src}#t=${clip.start}${clip.end === null ? '' : `,${clip.end}`}` : src;
 
 // a job's time so far, from when it was created (the wait in the queue too)
 function jobTime(job: Job | undefined, now: number): string | null {
@@ -110,7 +119,7 @@ export default function Stt() {
       if (jobId) {
         job = await resumeJob(jobId, onJob);
       } else {
-        const started = await startSpeakerParagraphs(m.audio, chunks, m.uid);
+        const started = await startSpeakerParagraphs(m.audio, chunks, m.uid, m.clip);
         if (stale()) return;
         setParams((p) => {
           const next = new URLSearchParams(p);
@@ -172,7 +181,7 @@ export default function Stt() {
       if (jobId) {
         job = await resumeJob(jobId, onJob);
       } else {
-        const created = await startTranscribe(m.audio);
+        const created = await startTranscribe(m.audio, m.clip);
         if (stale()) return;
         setParams({ src: inputKey(input), job: created.id }, { replace: true });
         job = await waitJob(created, onJob);
@@ -229,7 +238,8 @@ export default function Stt() {
           <h1>תמלול</h1>
           <p className="muted">
             קישור לשיעור ב־kabbalahmedia.info, מזהה השיעור, או קישור ישיר לקובץ שמע / וידאו. הטקסט מוצג מיד אחרי זיהוי
-            הדיבור, ואחר כך מתחלק לפסקאות עם הדוברים: רב, קריין, תלמיד.
+            הדיבור, ואחר כך מתחלק לפסקאות עם הדוברים: הרב, קריין, תלמיד. קישור לקטע מהשיעור (sstart / send) — רק
+            הקטע מתומלל.
           </p>
         </header>
 
@@ -443,7 +453,7 @@ function SttResultView({ media, recognition, speakers, params }: {
     <section className="stt stt-flow">
       <div className="stt-flow__side">
         <VideoPlayer
-          src={media.video || media.audio}
+          src={withClip(media.video || media.audio, media.clip)}
           trackUrl={trackUrl}
           trackLabel={STT_MODEL}
           videoRef={videoRef}

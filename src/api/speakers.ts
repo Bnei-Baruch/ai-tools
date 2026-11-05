@@ -1,8 +1,9 @@
 import { chunksToSrt, type Chunk } from './transcribe';
 import { formOf, jobResult, postJob, waitJob, type Job } from './aiTrns';
+import { clipFields, type Clip } from '../stt/input.ts';
 
 // One paragraph of an ai-trns diarize job (?format=paragraphs): a new one at every speaker change, the
-// Rav's speech split by the paragraphing model. label: רב / קריין / תלמיד (ai-trns labels.py).
+// Rav's speech split by the paragraphing model. label: הרב / קריין / תלמיד (ai-trns labels.py).
 interface Paragraph {
   speaker: string | null;
   label: string | null;
@@ -27,9 +28,12 @@ export function sourcesUsed(job: Job): string[] | null {
 
 // Starts a diarize job with paragraphs for the model's transcript (its chunks) of the audio at `url`.
 // uid: the kabbalahmedia lesson, for its source (see lessonSourceFields); none -> the reader is told by voice only.
-export async function startSpeakerParagraphs(url: string, chunks: Chunk[], uid?: string | null): Promise<{ job: Job }> {
+// clip: only that part of the media is diarized (chunks and the result in the media's time).
+export async function startSpeakerParagraphs(url: string, chunks: Chunk[], uid?: string | null,
+                                             clip?: Clip | null): Promise<{ job: Job }> {
   const srt = new File([chunksToSrt(chunks)], 'transcript.srt', { type: 'application/x-subrip' });
-  const job = await postJob('/diarize/words', formOf({ url, srt, paragraphs: 'true', ...lessonSourceFields(uid) }));
+  const job = await postJob('/diarize/words', formOf({ url, srt, paragraphs: 'true', ...lessonSourceFields(uid),
+                                                       ...clipFields(clip) }));
   return { job };
 }
 
