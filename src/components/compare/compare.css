@@ -73,3 +73,12 @@
 .compare-group__speaker--reader { color: #047857; }
 .compare-group__speaker--student { color: #9333ea; }
 .compare__speakers { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+
+/* תמלול (Stt.tsx) on TextColumn: the current paragraph, the reader's folded and paler */
+.compare-group--current { background: var(--primary-soft); border-radius: 6px; }
+.compare-group--reader { opacity: .6; font-size: .9rem; }
+.compare-group--reader.compare-group--current { opacity: .85; }
+.compare-group__fold {
+  border: 0; background: none; padding: 0 4px; color: var(--primary); font-size: .8rem; cursor: pointer;
+}
+.compare-group__fold:hover { text-decoration: underline; }

@@ -171,3 +171,28 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes indeterminate { from { inset-inline-start: -40%; } to { inset-inline-start: 100%; } }
+
+/* תמלול (Stt.tsx): the stages, the player beside the paragraphs */
+.stt-tool {
+  .container:has(.stt-flow) { max-width: 1280px; }
+  .stt-note { margin-top: 4px; font-size: .85rem; }
+  .stt-stages { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .stt-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .925rem; }
+  .stt-stage__icon { width: 18px; display: inline-flex; justify-content: center; }
+  .stt-stage--done .stt-stage__icon { color: var(--success); font-weight: 700; }
+  .stt-stage--error .stt-stage__icon, .stt-stage__error { color: var(--error); }
+  .stt-stage--idle { color: var(--muted); }
+  .stt-stage__title { font-weight: 600; }
+  .stt-stage__time { font-variant-numeric: tabular-nums; }
+  .stt-stage__retry { padding: 2px 10px; font-size: .85rem; }
+  .stt-flow { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .stt-flow__side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .stt-flow__side .player { position: static; }
+  .stt-flow__title { font-weight: 600; }
+  .stt-flow__help { font-size: .85rem; }
+  .stt-follow { margin-inline-start: 8px; padding: 2px 10px; font-size: .8rem; }
+  @media (max-width: 800px) {
+    .stt-flow { grid-template-columns: 1fr; }
+    .stt-flow__side { position: static; }
+  }
+}

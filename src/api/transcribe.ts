@@ -1,12 +1,17 @@
-import { aiTrnsFetch } from './aiTrns';
+import { aiTrnsFetch, waitJob, type Job } from './aiTrns';
+import { parseSrt } from './srt.ts';
+
+// SRT helpers live in srt.ts (no browser imports, so node tests can use them)
+export { chunksToSrt, parseSrt } from './srt.ts';
 
 export interface Chunk {
   start: number;
   end: number;
   text: string;
-  // a paragraph of the speakers view (api/speakers.ts): its speaker label, the time of each word of text
+  // a paragraph of the speakers view (api/speakers.ts): its speaker label, the start and end of each word of text
   speaker?: string | null;
   times?: number[];
+  ends?: number[];
 }
 
 export interface SttResult {
@@ -15,15 +20,6 @@ export interface SttResult {
   srt?: string;
   jobId: string;
 }
-
-// GET /jobs/{id} of ai-trns (the fields used here)
-interface Job {
-  id: string;
-  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
-  error?: string | null;
-}
-
-const POLL_INTERVAL_MS = 2000;
 
 export async function errorFrom(res: Response): Promise<Error> {
   const text = await res.text().catch(() => '');
@@ -37,10 +33,6 @@ export async function errorFrom(res: Response): Promise<Error> {
   return new Error(`${res.status}${detail ? `: ${detail}` : ` ${res.statusText}`}`);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw await errorFrom(res);
   return res.json() as Promise<T>;
@@ -48,57 +40,27 @@ async function json<T>(res: Response): Promise<T> {
 
 // An ai-trns job for a media URL (Hebrew): POST /jobs -> poll GET /jobs/{id} -> the SRT.
 export async function transcribe(url: string): Promise<SttResult> {
+  const job = await startTranscribe(url);
+  await waitJob(job);
+  return transcriptOf(job.id);
+}
+
+// POST /jobs for a media URL (Hebrew, SRT) -> the queued job; wait for it with waitJob / resumeJob (aiTrns.ts)
+export async function startTranscribe(url: string): Promise<Job> {
   const form = new FormData();
   form.set('url', url);
   form.set('lang', 'he');
   form.set('format', 'srt');
-  let job = await json<Job>(await aiTrnsFetch('/jobs', { method: 'POST', body: form }));
+  return json<Job>(await aiTrnsFetch('/jobs', { method: 'POST', body: form }));
+}
 
-  while (job.status === 'queued' || job.status === 'running') {
-    await sleep(POLL_INTERVAL_MS);
-    job = await json<Job>(await aiTrnsFetch(`/jobs/${job.id}`));
-  }
-  if (job.status !== 'done') throw new Error(job.error || 'התמלול נכשל');
-
-  const res = await aiTrnsFetch(`/jobs/${job.id}/result?format=srt`);
+// A finished transcribe job's SRT, as chunks
+export async function transcriptOf(jobId: string): Promise<SttResult> {
+  const res = await aiTrnsFetch(`/jobs/${jobId}/result?format=srt`);
   if (!res.ok) throw await errorFrom(res);
   const srt = await res.text();
   const chunks = parseSrt(srt);
-  return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId: job.id };
-}
-
-// Parses "HH:MM:SS,mmm" SRT timestamps into seconds.
-function srtTimeToSeconds(t: string): number {
-  const [h, m, rest] = t.split(':');
-  const [s, ms] = rest.split(',');
-  return Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(ms) / 1000;
-}
-
-export function parseSrt(srt: string): Chunk[] {
-  const blocks = srt.replace(/\r\n/g, '\n').trim().split(/\n\n+/);
-  const chunks: Chunk[] = [];
-  for (const block of blocks) {
-    const lines = block.split('\n').filter((l) => l.trim() !== '');
-    const timeLine = lines.find((l) => l.includes('-->'));
-    if (!timeLine) continue;
-    const [start, end] = timeLine.split('-->').map((t) => srtTimeToSeconds(t.trim()));
-    const text = lines.slice(lines.indexOf(timeLine) + 1).join(' ').trim();
-    if (text) chunks.push({ start, end, text });
-  }
-  return chunks;
-}
-
-// "HH:MM:SS,mmm" for SRT
-function srtTime(s: number): string {
-  const ms = Math.round(s * 1000);
-  const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
-  const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
-  const sec = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
-  return `${h}:${m}:${sec},${String(ms % 1000).padStart(3, '0')}`;
-}
-
-export function chunksToSrt(chunks: Chunk[]): string {
-  return chunks.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n');
+  return { text: chunks.map((c) => c.text).join(' '), chunks, srt, jobId };
 }
 
 // "HH:MM:SS.mmm" timestamp for WebVTT cues
