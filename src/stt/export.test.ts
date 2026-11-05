@@ -17,6 +17,17 @@ test('paragraphsToTxt: blank line between paragraphs, label where the speaker ch
   assert.equal(paragraphsToTxt([{ start: 0, end: 1, text: 'בלי דובר' }]), 'בלי דובר\n');
 });
 
+test('the label of a paragraph reading the source says so, and changes there', () => {
+  const ps: Chunk[] = [
+    { start: 0, end: 1, text: 'קטע מספר 2', speaker: 'קריין', reading: false },
+    { start: 1, end: 2, text: 'ובזה תבין', speaker: 'קריין', reading: true },
+    { start: 2, end: 3, text: 'את דברי', speaker: 'קריין', reading: true },
+    { start: 3, end: 4, text: 'שאלה מחבר', speaker: 'קריין', reading: false },
+  ];
+  assert.equal(paragraphsToTxt(ps), 'קריין: קטע מספר 2\n\nקריין (קריאה): ובזה תבין\n\nאת דברי\n\nקריין: שאלה מחבר\n');
+  assert.ok(docxDocumentXml(ps).includes('<w:t xml:space="preserve">קריין (קריאה): </w:t>'));
+});
+
 test('paragraphWords: the words for /diarize/words/srt, each with its paragraph speaker', () => {
   const words = paragraphWords(paragraphs);
   assert.equal(words.length, 2 + 1 + 3 + 4);

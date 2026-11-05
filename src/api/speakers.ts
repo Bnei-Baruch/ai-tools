@@ -6,6 +6,8 @@ import { formOf, jobResult, postJob, waitJob, type Job } from './aiTrns';
 interface Paragraph {
   speaker: string | null;
   label: string | null;
+  // reads the lesson's source aloud, not speaking (ai-trns paragraphs/build.py reading_words)
+  reading?: boolean;
   start: number;
   end: number;
   text: string;
@@ -44,6 +46,7 @@ export async function paragraphsOf(jobId: string): Promise<Chunk[]> {
         end: p.end,
         text: words.map((w) => w.word.trim()).join(' '),
         speaker: p.label,
+        reading: p.reading,
         times: words.map((w) => w.start),
         ends: words.map((w) => w.end),
       };

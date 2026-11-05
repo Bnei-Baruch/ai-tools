@@ -10,6 +10,8 @@ export interface Chunk {
   text: string;
   // a paragraph of the speakers view (api/speakers.ts): its speaker label, the start and end of each word of text
   speaker?: string | null;
+  // the paragraph reads the lesson's source aloud (whoever reads it); undefined: not known (an older job)
+  reading?: boolean;
   times?: number[];
   ends?: number[];
 }

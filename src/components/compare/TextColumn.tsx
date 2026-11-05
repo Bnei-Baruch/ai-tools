@@ -33,8 +33,11 @@ interface Props {
   marks?: ColumnMarks;
   // speaker label of each group (the speakers view), shown before its text
   labels?: (string | null | undefined)[];
-  // the reader's groups (label קריין) paler, and folded to their first words until clicked open
+  // the groups reading the source (`reading`; not given for a group: its label is קריין) paler, and folded to
+  // their first words until clicked open
   foldReader?: boolean;
+  // per group: it reads the lesson's source aloud (whoever reads), not speaking
+  reading?: (boolean | undefined)[];
   // the group with the active word highlighted
   highlightGroup?: boolean;
   // in the header instead of the word / difference counts, and buttons at its end
@@ -60,7 +63,7 @@ interface Group {
 // where the other side has words this one lacks.
 export default function TextColumn({
   title, side, words, hunks, activeWord, selected, follow, onSeek, onHunk, marks, labels,
-  foldReader, highlightGroup, stats, actions, onUserScroll,
+  foldReader, reading, highlightGroup, stats, actions, onUserScroll,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // the reader's groups opened (by their first word)
@@ -143,7 +146,8 @@ export default function TextColumn({
         {words.length === 0 && <div className="transcript__empty">—</div>}
         {groups.map((g, i) => {
           const label = labels?.[words[g.from].group] ?? null;
-          const reader = !!foldReader && label === READER;
+          const reads = reading?.[words[g.from].group];
+          const reader = !!foldReader && (reads ?? label === READER);
           const current = activeWord >= g.from && activeWord < g.to;
           return (
           <div key={i}>
@@ -161,6 +165,7 @@ export default function TextColumn({
               markable={!!marks}
               mark={marks?.state(words[g.from].group) ?? null}
               label={label}
+              reads={!!reads}
             />
             {marks?.render(words[g.from].group)}
           </div>
@@ -188,12 +193,14 @@ interface GroupProps {
   current?: boolean;
   // the reader's (foldReader), and folded to its first words
   reader?: boolean;
+  // reads the source: "(קריאה)" after the label
+  reads?: boolean;
   folded?: boolean;
 }
 
 // Memoized: on each timeupdate only the groups with the active word (before and after) re-render.
 const GroupText = memo(function GroupText({
-  words, from, to, gaps, last, active, selected, markable, mark, label, current, reader, folded,
+  words, from, to, gaps, last, active, selected, markable, mark, label, current, reader, reads, folded,
 }: GroupProps) {
   const gap = (at: number) =>
     gaps.get(at)?.map((hunk) => (
@@ -227,7 +234,7 @@ const GroupText = memo(function GroupText({
     <p className={cls}>
       <span className="chunk__ts" data-ts={from}>{formatTimestamp(words[from].time)}</span>
       <span dir="auto" className="compare-group__text">
-        {label && <strong className={`compare-group__speaker compare-group__speaker--${SPEAKER_CLASS[label] ?? 'other'}`}>{label}: </strong>}
+        {label && <strong className={`compare-group__speaker compare-group__speaker--${SPEAKER_CLASS[label] ?? 'other'}`}>{label}{reads && ' (קריאה)'}: </strong>}
         {items}
       </span>
       {markable && (

@@ -25,13 +25,19 @@ export function paragraphWords(paragraphs: Chunk[]): SpeakerWord[] {
   });
 }
 
-// Plain text: a blank line between paragraphs, "<label>: " where the speaker changes
+// A paragraph's label in the text: its speaker, "(קריאה)" after it if it reads the source
+export function labelOf(p: Chunk): string | null {
+  return p.speaker ? p.speaker + (p.reading ? ' (קריאה)' : '') : null;
+}
+
+// Plain text: a blank line between paragraphs, "<label>: " where the label changes
 export function paragraphsToTxt(paragraphs: Chunk[]): string {
   let last: string | null | undefined;
   return paragraphs
     .map((p, i) => {
-      const label = p.speaker && (i === 0 || p.speaker !== last) ? `${p.speaker}: ` : '';
-      last = p.speaker;
+      const tag = labelOf(p);
+      const label = tag && (i === 0 || tag !== last) ? `${tag}: ` : '';
+      last = tag;
       return label + p.text;
     })
     .join('\n\n') + '\n';
@@ -42,13 +48,14 @@ const xml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const RUN_RTL = '<w:rPr><w:rtl/></w:rPr>';
 const RUN_RTL_BOLD = '<w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr>';
 
-// word/document.xml: a right-to-left paragraph per paragraph, the label (where the speaker changes) in bold
+// word/document.xml: a right-to-left paragraph per paragraph, the label (where it changes) in bold
 export function docxDocumentXml(paragraphs: Chunk[]): string {
   let last: string | null | undefined;
   const body = paragraphs
     .map((p, i) => {
-      const label = p.speaker && (i === 0 || p.speaker !== last) ? p.speaker : null;
-      last = p.speaker;
+      const tag = labelOf(p);
+      const label = tag && (i === 0 || tag !== last) ? tag : null;
+      last = tag;
       const runs = [
         label && `<w:r>${RUN_RTL_BOLD}<w:t xml:space="preserve">${xml(label)}: </w:t></w:r>`,
         `<w:r>${RUN_RTL}<w:t xml:space="preserve">${xml(p.text)}</w:t></w:r>`,

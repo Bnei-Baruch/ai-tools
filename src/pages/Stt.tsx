@@ -334,6 +334,7 @@ function SttResultView({ media, recognition, speakers, params }: {
   const chunks = paragraphs ?? (result?.chunks.length ? result.chunks : null);
   const words = useMemo(() => (chunks ? modelWords(chunks) : []), [chunks]);
   const labels = useMemo(() => paragraphs?.map((p) => p.speaker), [paragraphs]);
+  const reading = useMemo(() => paragraphs?.map((p) => p.reading), [paragraphs]);
   const [currentTime, setCurrentTime] = useState(0);
   const [follow, setFollow] = useState(true);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -453,7 +454,7 @@ function SttResultView({ media, recognition, speakers, params }: {
         {chunks && (
           <p className="muted stt-flow__help">
             לחיצה על מילה — ניגון ממנה. ✎ ליד שורה מסמן מקום בעייתי, „העתקה” מעתיקה את המסומנים.
-            {paragraphs && ' קטעי הקריאה (קריין) מקופלים: „עוד” פותח.'}
+            {paragraphs && ' קטעי הקריאה מהמקור מקופלים: „עוד” פותח.'}
           </p>
         )}
         <ErrorAlert error={exportError} />
@@ -472,6 +473,7 @@ function SttResultView({ media, recognition, speakers, params }: {
           onHunk={() => {}}
           marks={columnMarks}
           labels={labels}
+          reading={reading}
           foldReader
           highlightGroup
           stats={stats}
