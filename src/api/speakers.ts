@@ -14,12 +14,14 @@ interface Paragraph {
 }
 
 // The lesson's source text, so turns reading it are labeled the reader's (קריין): the form fields for it, and
-// whether the job has one. Today the client fetches it (the LIKUTIM .docx) and uploads it. When ai-trns finds
-// the source by the lesson itself (ai-trns TASK-speakers-paragraphs.md), this becomes
+// whether the job has one. Until ai-trns with `uid` is deployed (it finds the lesson's sources itself, ai-trns
+// TASK-speakers-paragraphs.md), both go: the old server ignores `uid`, the new one prefers the uploaded file.
+// After the deploy this becomes
 //   return { fields: { uid }, withSource: !!uid };
+// (which sources the server used: the job's stats.sources).
 async function lessonSourceFields(uid?: string | null): Promise<{ fields: Record<string, unknown>; withSource: boolean }> {
   const source = uid ? await fetchLessonSource(uid).catch(() => null) : null;
-  return { fields: { source }, withSource: !!source };
+  return { fields: { uid, source }, withSource: !!source };
 }
 
 // Starts a diarize job with paragraphs for the model's transcript (its chunks) of the audio at `url`.
