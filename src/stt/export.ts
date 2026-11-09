@@ -41,8 +41,10 @@ const xml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 const RUN_RTL = '<w:rPr><w:rtl/></w:rPr>';
 const RUN_RTL_BOLD = '<w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr>';
+const RUN_RTL_BOLD_UNDERLINE = '<w:rPr><w:b/><w:bCs/><w:u w:val="single"/><w:rtl/></w:rPr>';
 
-// word/document.xml: a right-to-left paragraph per paragraph, the label (where the speaker changes) in bold
+// word/document.xml: a right-to-left paragraph per paragraph, the label (where the speaker changes) in bold,
+// the label's word underlined (not the colon)
 export function docxDocumentXml(paragraphs: Chunk[]): string {
   let last: string | null | undefined;
   const body = paragraphs
@@ -50,7 +52,8 @@ export function docxDocumentXml(paragraphs: Chunk[]): string {
       const label = p.speaker && (i === 0 || p.speaker !== last) ? p.speaker : null;
       last = p.speaker;
       const runs = [
-        label && `<w:r>${RUN_RTL_BOLD}<w:t xml:space="preserve">${xml(label)}: </w:t></w:r>`,
+        label && `<w:r>${RUN_RTL_BOLD_UNDERLINE}<w:t xml:space="preserve">${xml(label)}</w:t></w:r>`
+          + `<w:r>${RUN_RTL_BOLD}<w:t xml:space="preserve">: </w:t></w:r>`,
         `<w:r>${RUN_RTL}<w:t xml:space="preserve">${xml(p.text)}</w:t></w:r>`,
       ].filter(Boolean).join('');
       return `<w:p><w:pPr><w:bidi/><w:spacing w:after="160"/></w:pPr>${runs}</w:p>`;

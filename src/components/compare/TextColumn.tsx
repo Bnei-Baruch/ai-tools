@@ -227,7 +227,7 @@ const GroupText = memo(function GroupText({
     <p className={cls}>
       <span className="chunk__ts" data-ts={from}>{formatTimestamp(words[from].time)}</span>
       <span dir="auto" className="compare-group__text">
-        {label && <strong className={`compare-group__speaker compare-group__speaker--${SPEAKER_CLASS[label] ?? 'other'}`}>{label}: </strong>}
+        {label && <strong className={`compare-group__speaker compare-group__speaker--${SPEAKER_CLASS[label] ?? 'other'}`}><u>{label}</u>: </strong>}
         {items}
       </span>
       {markable && (

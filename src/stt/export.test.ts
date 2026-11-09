@@ -37,11 +37,13 @@ test('SRT of the recognition stage round-trips', () => {
   assert.deepEqual(parseSrt(srt), chunks);
 });
 
-test('docxDocumentXml: RTL paragraphs, bold labels, escaped text', () => {
+test('docxDocumentXml: RTL paragraphs, bold labels with the word underlined, escaped text', () => {
   const doc = docxDocumentXml(paragraphs);
   assert.equal((doc.match(/<w:p>/g) ?? []).length, 4);
   assert.equal((doc.match(/<w:bidi\/>/g) ?? []).length, 5);
-  assert.ok(doc.includes('<w:b/><w:bCs/><w:rtl/></w:rPr><w:t xml:space="preserve">קריין: </w:t>'));
+  assert.ok(doc.includes('<w:b/><w:bCs/><w:u w:val="single"/><w:rtl/></w:rPr><w:t xml:space="preserve">קריין</w:t></w:r>'
+    + '<w:r><w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr><w:t xml:space="preserve">: </w:t>'));
   assert.ok(doc.includes('שאלה &lt;קטנה&gt; &amp; עוד'));
-  assert.equal((doc.match(/<w:b\/>/g) ?? []).length, 3);
+  assert.equal((doc.match(/<w:b\/>/g) ?? []).length, 6);
+  assert.equal((doc.match(/<w:u w:val="single"\/>/g) ?? []).length, 3);
 });
