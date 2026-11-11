@@ -6,7 +6,7 @@ import { resumeJob, waitJob, type Job } from '../api/aiTrns';
 import { paragraphsOf, sourcesUsed, startSpeakerParagraphs } from '../api/speakers';
 import { fetchUnit, fileUrl, pickFiles } from '../api/kmedia';
 import { wordsToSrt } from '../api/tools';
-import { formatTime, inputKey, parseSttInput, type Clip, type SttInput } from '../stt/input';
+import { formatTime, inputKey, lessonUrl, parseSttInput, type Clip, type SttInput } from '../stt/input';
 import {
   DOCX_TYPE, paragraphWords, paragraphsToDocx, paragraphsToLessonDocx, paragraphsToTxt, type LessonDocHeader,
 } from '../stt/export';
@@ -86,6 +86,7 @@ async function resolveMedia(input: SttInput): Promise<Media> {
       title: unit.name,
       // as the typed transcripts' files: heb_o_rav_2002-10-14_lesson_…_n1_lT4XU7v9
       name: `${withoutExt(audio.name)}_${unit.id}${part}`,
+      link: lessonUrl(unit.id, input.clip),
       ending: input.clip?.end != null ? '(סוף הקטע)' : '(סוף השיעור)',
     },
   };

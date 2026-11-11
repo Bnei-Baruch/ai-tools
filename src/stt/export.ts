@@ -99,6 +99,8 @@ export interface LessonDocHeader {
   title?: string;
   // "heb_o_rav_2002-10-14_lesson_…_n1_lT4XU7v9"
   name?: string;
+  // the lesson's page in kabbalahmedia, a link under the file's name
+  link?: string;
   // "(סוף השיעור)"
   ending?: string;
 }
@@ -123,6 +125,7 @@ interface RunStyle {
   sz?: number;
   highlight?: boolean;
   ltr?: boolean;
+  link?: boolean;
 }
 
 function run(text: string, s: RunStyle = {}): string {
@@ -130,7 +133,8 @@ function run(text: string, s: RunStyle = {}): string {
     s.b && '<w:b/><w:bCs/>',
     s.sz && `<w:sz w:val="${s.sz}"/><w:szCs w:val="${s.sz}"/>`,
     s.highlight && '<w:highlight w:val="yellow"/>',
-    s.u && '<w:u w:val="single"/>',
+    s.link && '<w:color w:val="0563C1"/>',
+    (s.u || s.link) && '<w:u w:val="single"/>',
     !s.ltr && '<w:rtl/>',
   ].filter(Boolean).join('');
   return `<w:r><w:rPr>${pr}</w:rPr><w:t xml:space="preserve">${xml(text)}</w:t></w:r>`;
@@ -157,6 +161,10 @@ export function lessonDocumentXml(paragraphs: Chunk[], header: LessonDocHeader =
   out.push(EMPTY, EMPTY);
   if (header.title) out.push(para(run(header.title, { b: true, sz: 32, u: true }), 'center'));
   if (header.name) out.push(para(run(header.name, { sz: 20, ltr: true }), 'center'));
+  if (header.link) {
+    const link = run(header.link, { sz: 20, ltr: true, link: true });
+    out.push(para(`<w:hyperlink r:id="rIdLink" w:history="1">${link}</w:hyperlink>`, 'center'));
+  }
   out.push(EMPTY, EMPTY);
 
   let last: string | null | undefined;
@@ -203,10 +211,14 @@ const LESSON_FOOTER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   + '<w:p><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr>'
   + '<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p></w:ftr>';
 
-const LESSON_DOC_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+const lessonDocRels = (link?: string) => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
   + '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
   + '<Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
+  + (link
+    ? '<Relationship Id="rIdLink" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"'
+      + ` Target="${xml(link)}" TargetMode="External"/>`
+    : '')
   + '</Relationships>';
 
 const LESSON_CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -226,6 +238,6 @@ export async function paragraphsToLessonDocx(paragraphs: Chunk[], header: Lesson
   zip.file('word/document.xml', lessonDocumentXml(paragraphs, header));
   zip.file('word/styles.xml', LESSON_STYLES);
   zip.file('word/footer1.xml', LESSON_FOOTER);
-  zip.file('word/_rels/document.xml.rels', LESSON_DOC_RELS);
+  zip.file('word/_rels/document.xml.rels', lessonDocRels(header.link));
   return zip.generateAsync({ type: 'blob', mimeType: DOCX_TYPE });
 }

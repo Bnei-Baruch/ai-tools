@@ -67,10 +67,16 @@ export function parseSttInput(value: string): SttInput | null {
 // The value kept in the page's address (?src=): the uid for a lesson (a clip: its link), the link for media
 export function inputKey(input: SttInput): string {
   if (input.kind === 'media') return input.url;
-  if (!input.clip) return input.uid;
-  const q = new URLSearchParams({ sstart: formatTime(input.clip.start) });
-  if (input.clip.end !== null) q.set('send', formatTime(input.clip.end));
-  return `https://kabbalahmedia.info/he/lessons/cu/${input.uid}?${q}`;
+  return input.clip ? lessonUrl(input.uid, input.clip) : input.uid;
+}
+
+// The lesson's page in kabbalahmedia (a clip: with its sstart / send)
+export function lessonUrl(uid: string, clip?: Clip): string {
+  const url = `https://kabbalahmedia.info/he/lessons/cu/${uid}`;
+  if (!clip) return url;
+  const q = new URLSearchParams({ sstart: formatTime(clip.start) });
+  if (clip.end !== null) q.set('send', formatTime(clip.end));
+  return `${url}?${q}`;
 }
 
 // The clip as ai-trns job fields (seconds); none -> {}
