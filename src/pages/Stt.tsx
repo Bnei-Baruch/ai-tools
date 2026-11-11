@@ -7,7 +7,9 @@ import { paragraphsOf, sourcesUsed, startSpeakerParagraphs } from '../api/speake
 import { fetchUnit, fileUrl, pickFiles } from '../api/kmedia';
 import { wordsToSrt } from '../api/tools';
 import { formatTime, inputKey, parseSttInput, type Clip, type SttInput } from '../stt/input';
-import { DOCX_TYPE, paragraphWords, paragraphsToDocx, paragraphsToTxt } from '../stt/export';
+import {
+  DOCX_TYPE, paragraphWords, paragraphsToDocx, paragraphsToLessonDocx, paragraphsToTxt, type LessonDocHeader,
+} from '../stt/export';
 import { modelWords, wordAt } from '../compare/compare';
 import { formatElapsed, saveBlob } from '../utils';
 import useObjectUrl from '../hooks/useObjectUrl';
@@ -29,6 +31,8 @@ interface Media {
   uid?: string;
   // a part of the lesson (its link's sstart / send): only it is processed, the times stay the lesson's
   clip?: Clip;
+  // the header of the lesson-style .docx
+  doc?: LessonDocHeader;
 }
 
 type Stage<T> =
@@ -47,15 +51,24 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 
 async function resolveMedia(input: SttInput): Promise<Media> {
   if (input.kind === 'media') return { audio: input.url };
-  const unit = await fetchUnit(input.uid);
+  const unit = await fetchUnit(input.uid, 'he');
   const { audio, video } = pickFiles(unit);
   if (!audio) throw new Error('לשיעור אין קובץ שמע בשפת המקור');
+  const clip = input.clip && clipText(input.clip);
   return {
     audio: fileUrl(audio),
     video: video && fileUrl(video),
-    title: [unit.name, unit.film_date, input.clip && clipText(input.clip)].filter(Boolean).join(' · '),
+    title: [unit.name, unit.film_date, clip].filter(Boolean).join(' · '),
     uid: unit.id,
     clip: input.clip,
+    doc: {
+      heading: ['תמלול שיעור', unit.film_date && unit.film_date.split('-').reverse().join('.'), clip && `(${clip})`]
+        .filter(Boolean).join(' '),
+      title: unit.name,
+      // as the typed transcripts' files: heb_o_rav_2002-10-14_lesson_…_n1_lT4XU7v9
+      name: `${audio.name.replace(/\.[^.]+$/, '')}_${unit.id}`,
+      ending: input.clip?.end != null ? '(סוף הקטע)' : '(סוף השיעור)',
+    },
   };
 }
 
@@ -422,6 +435,13 @@ function SttResultView({ media, recognition, speakers, params }: {
     if (paragraphs) saveBlob(new Blob([await paragraphsToDocx(paragraphs)], { type: DOCX_TYPE }), `${name}.docx`);
   }
 
+  // laid out as the lessons' typed transcripts (heb_o_rav_…_<uid>.doc)
+  async function downloadLessonDocx() {
+    if (!paragraphs) return;
+    const blob = await paragraphsToLessonDocx(paragraphs, media.doc ?? { title: media.title });
+    saveBlob(blob, `${media.doc?.name ?? name}.docx`);
+  }
+
   const stats = chunks && (
     <>
       {paragraphs ? `${chunks.length} פסקאות` : `${chunks.length} שורות`} · {words.length} מילים
@@ -446,6 +466,12 @@ function SttResultView({ media, recognition, speakers, params }: {
       </button>
       <button type="button" className="btn btn--ghost" onClick={downloadTxt}>TXT</button>
       {paragraphs && <button type="button" className="btn btn--ghost" onClick={downloadDocx}>DOCX</button>}
+      {paragraphs && (
+        <button type="button" className="btn btn--ghost" onClick={downloadLessonDocx}
+          title="DOCX בעיצוב של קובצי ההקלדה של השיעורים">
+          DOCX הקלדה
+        </button>
+      )}
     </>
   );
 
