@@ -27,6 +27,8 @@ interface Media {
   audio: string;
   video?: string;
   title?: string;
+  // the processed audio file's name, without its extension: the downloads are named by it
+  name?: string;
   // a kabbalahmedia lesson: its source tells the reader (קריין) apart
   uid?: string;
   // a part of the lesson (its link's sstart / send): only it is processed, the times stay the lesson's
@@ -49,16 +51,33 @@ class Stale extends Error {}
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+const withoutExt = (name: string) => name.replace(/\.[^./]+$/, '');
+
+// the file's name in a link: https://…/heb_o_rav_….mp3?x=1 -> heb_o_rav_…
+function urlFileName(url: string): string | undefined {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop();
+    return last ? withoutExt(decodeURIComponent(last)) || undefined : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function resolveMedia(input: SttInput): Promise<Media> {
-  if (input.kind === 'media') return { audio: input.url };
+  if (input.kind === 'media') return { audio: input.url, name: urlFileName(input.url) };
   const unit = await fetchUnit(input.uid, 'he');
   const { audio, video } = pickFiles(unit);
   if (!audio) throw new Error('לשיעור אין קובץ שמע בשפת המקור');
   const clip = input.clip && clipText(input.clip);
+  // a part of the lesson: its times in the files' names (_12m30s-45m0s; no end: _12m30s-)
+  const part = input.clip
+    ? `_${formatTime(input.clip.start)}-${input.clip.end === null ? '' : formatTime(input.clip.end)}`
+    : '';
   return {
     audio: fileUrl(audio),
     video: video && fileUrl(video),
     title: [unit.name, unit.film_date, clip].filter(Boolean).join(' · '),
+    name: `${withoutExt(audio.name)}${part}`,
     uid: unit.id,
     clip: input.clip,
     doc: {
@@ -66,7 +85,7 @@ async function resolveMedia(input: SttInput): Promise<Media> {
         .filter(Boolean).join(' '),
       title: unit.name,
       // as the typed transcripts' files: heb_o_rav_2002-10-14_lesson_…_n1_lT4XU7v9
-      name: `${audio.name.replace(/\.[^.]+$/, '')}_${unit.id}`,
+      name: `${withoutExt(audio.name)}_${unit.id}${part}`,
       ending: input.clip?.end != null ? '(סוף הקטע)' : '(סוף השיעור)',
     },
   };
@@ -366,7 +385,7 @@ function SttResultView({ media, recognition, speakers, params }: {
 
   const trackUrl = useObjectUrl(result?.chunks.length ? chunksToVtt(result.chunks) : null, 'text/vtt');
   const activeWord = useMemo(() => wordAt(words, currentTime), [words, currentTime]);
-  const name = media.uid || 'transcript';
+  const name = media.name || media.uid || 'transcript';
 
   const seek = useCallback((t: number) => {
     const video = videoRef.current;
