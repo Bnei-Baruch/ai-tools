@@ -58,16 +58,18 @@ jobs:
           name: build
           path: build/
 
+      # the host and its keys (ssh-keyscan lines) are the repo's secrets DEPLOY_HOST, DEPLOY_KNOWN_HOSTS
       - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          # ssh-keyscan ngx.kab.info
-          cat >> ~/.ssh/known_hosts <<'EOF'
-          ngx.kab.info ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDWoETL4o1h0Jfy8Iotq0FMHCEeOICgr4IHAFbACQSro
-          ngx.kab.info ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMF7krGEChzELXEpRLepaIsMEPftKWFx9JtuwPwiVnu5SqSX1Ra9kdDmxx3V74fJj6wgdJGJV8jYcxN1MDYb+ss=
-          EOF
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
 
       - name: Deploy
-        run: rsync -av -e "ssh -i ~/.ssh/id_deploy" build/ root@ngx.kab.info:/usr/share/angie/html/ai-tools/
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: rsync -av -e "ssh -i ~/.ssh/id_deploy" build/ "root@$DEPLOY_HOST:/usr/share/angie/html/ai-tools/"
