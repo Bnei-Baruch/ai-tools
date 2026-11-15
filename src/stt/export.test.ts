@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { docxDocumentXml, paragraphWords, paragraphsToTxt } from './export.ts';
+import { clockTime, docxDocumentXml, lessonDocumentXml, paragraphWords, paragraphsToTxt } from './export.ts';
 import { chunksToSrt, parseSrt } from '../api/srt.ts';
 import type { Chunk } from '../api/transcribe';
 
@@ -46,4 +46,29 @@ test('docxDocumentXml: RTL paragraphs, bold labels with the word underlined, esc
   assert.ok(doc.includes('שאלה &lt;קטנה&gt; &amp; עוד'));
   assert.equal((doc.match(/<w:b\/>/g) ?? []).length, 6);
   assert.equal((doc.match(/<w:u w:val="single"\/>/g) ?? []).length, 3);
+});
+
+test('clockTime: m:ss, h:mm:ss', () => {
+  assert.equal(clockTime(197), '3:17');
+  assert.equal(clockTime(3725), '1:02:05');
+});
+
+test('lessonDocumentXml: header, labels where the speaker changes, a student in bold, time marks', () => {
+  const long: Chunk[] = [
+    { start: 0, end: 100, text: 'פתיחה', speaker: 'הרב' },
+    { start: 100, end: 197, text: 'המשך', speaker: 'הרב' },
+    { start: 197, end: 200, text: 'שאלה', speaker: 'תלמיד' },
+    { start: 200, end: 210, text: 'תשובה', speaker: 'הרב' },
+    { start: 210, end: 220, text: 'קטע', speaker: 'קריין' },
+  ];
+  const doc = lessonDocumentXml(long, { heading: 'תמלול שיעור 14.10.2002', title: 'שם', name: 'heb_o_rav_x_uid' });
+  for (const s of ['תמלול שיעור 14.10.2002', 'heb_o_rav_x_uid', '(סוף השיעור)', 'w:fill="FFFF00"', '<w:footerReference']) {
+    assert.ok(doc.includes(s), s);
+  }
+  // labels: הרב, תלמיד, הרב, קריין (not on the continuation)
+  assert.equal((doc.match(/<w:u w:val="single"\/><w:rtl\/><\/w:rPr><w:t xml:space="preserve">[^<]+:</g) ?? []).length, 4);
+  assert.ok(doc.includes('<w:rPr><w:b/><w:bCs/><w:rtl/></w:rPr><w:t xml:space="preserve">שאלה</w:t>'));
+  assert.ok(doc.includes('<w:rPr><w:rtl/></w:rPr><w:t xml:space="preserve">תשובה</w:t>'));
+  // the one time mark: at 3:17, the first paragraph end 3 minutes in
+  assert.deepEqual([...doc.matchAll(/<w:highlight w:val="yellow"\/><\/w:rPr><w:t xml:space="preserve">([^<]+)</g)].map((m) => m[1]), ['3:17']);
 });

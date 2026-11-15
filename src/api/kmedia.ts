@@ -40,10 +40,12 @@ export function parseUnitUid(input: string): string | null {
   }
 }
 
-export async function fetchUnit(uid: string): Promise<ContentUnit> {
+// lang: the unit's name in this language (e.g. 'he'), else the backend's default (English)
+export async function fetchUnit(uid: string, lang?: string): Promise<ContentUnit> {
+  const q = lang ? `?${new URLSearchParams({ ui_language: lang, content_languages: lang })}` : '';
   let res: Response;
   try {
-    res = await fetch(`${BACKEND}/content_units/${encodeURIComponent(uid)}`);
+    res = await fetch(`${BACKEND}/content_units/${encodeURIComponent(uid)}${q}`);
   } catch {
     throw new Error('kabbalahmedia.info אינו זמין');
   }
